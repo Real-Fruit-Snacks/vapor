@@ -474,52 +474,163 @@
       padding: 32px;
     }
 
-    .arch-diagram {
-      font-size: 13px;
-      color: var(--ctp-subtext0);
-      line-height: 1.8;
-      margin-bottom: 28px;
-      white-space: pre;
-      overflow-x: auto;
-    }
-
-    .arch-diagram .arch-label {
-      color: var(--ctp-subtext1);
-      font-weight: 600;
-    }
-
-    .arch-diagram .arch-arrow {
-      color: var(--ctp-overlay1);
-    }
-
-    .arch-diagram .arch-highlight {
-      color: var(--ctp-teal);
-    }
-
     .arch-divider {
       border: none;
       border-top: 1px dashed var(--ctp-surface1);
       margin: 28px 0;
     }
 
-    .arch-wire {
-      font-size: 13px;
-      color: var(--ctp-subtext0);
-      line-height: 1.8;
-      white-space: pre;
-      overflow-x: auto;
+    /* ---- Data flow diagram ---- */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 0;
+      flex-wrap: nowrap;
     }
 
-    .arch-wire .wire-label {
+    .flow-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .flow-node-box {
+      padding: 14px 24px;
+      border: 1px solid var(--ctp-surface1);
+      border-radius: 6px;
+      background: var(--ctp-base);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ctp-teal);
+      white-space: nowrap;
+    }
+
+    .flow-node-label {
+      font-size: 11px;
+      color: var(--ctp-overlay1);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .flow-arrows {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 0 16px;
+      flex-shrink: 0;
+    }
+
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--ctp-overlay1);
+      white-space: nowrap;
+    }
+
+    .flow-arrow-line {
+      width: 60px;
+      height: 1px;
+      background: var(--ctp-surface2);
+      position: relative;
+    }
+
+    .flow-arrow-line::after {
+      content: '';
+      position: absolute;
+      right: -1px;
+      top: -3px;
+      border: 3px solid transparent;
+      border-left: 5px solid var(--ctp-surface2);
+    }
+
+    .flow-arrow--left .flow-arrow-line::after {
+      right: auto;
+      left: -1px;
+      border-left: none;
+      border-right: 5px solid var(--ctp-surface2);
+    }
+
+    .flow-arrow-tag {
+      padding: 2px 8px;
+      border-radius: 3px;
+      background: var(--ctp-surface0);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+    }
+
+    .flow-arrow-tag--tcp { color: var(--ctp-green); }
+    .flow-arrow-tag--enc { color: var(--ctp-mauve); }
+
+    /* ---- Wire format bar ---- */
+    .wire-bar-label {
+      font-size: 12px;
       color: var(--ctp-overlay1);
       font-weight: 500;
+      margin-bottom: 12px;
+      letter-spacing: 0.04em;
     }
 
-    .arch-wire .wire-teal   { color: var(--ctp-teal); }
-    .arch-wire .wire-blue   { color: var(--ctp-blue); }
-    .arch-wire .wire-mauve  { color: var(--ctp-mauve); }
-    .arch-wire .wire-peach  { color: var(--ctp-peach); }
-    .arch-wire .wire-yellow { color: var(--ctp-yellow); }
+    .wire-bar {
+      display: flex;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--ctp-surface1);
+      margin-bottom: 8px;
+    }
+
+    .wire-segment {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 0;
+      gap: 4px;
+      border-right: 1px solid var(--ctp-surface1);
+    }
+
+    .wire-segment:last-child {
+      border-right: none;
+    }
+
+    .wire-segment-name {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .wire-segment-detail {
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .wire-seg--len {
+      flex: 1;
+      background: rgba(148, 226, 213, 0.08);
+      color: var(--ctp-teal);
+    }
+
+    .wire-seg--nonce {
+      flex: 1.5;
+      background: rgba(137, 180, 250, 0.08);
+      color: var(--ctp-blue);
+    }
+
+    .wire-seg--ct {
+      flex: 3;
+      background: rgba(249, 226, 175, 0.08);
+      color: var(--ctp-yellow);
+    }
+
+    .wire-seg--mac {
+      flex: 1.5;
+      background: rgba(203, 166, 247, 0.08);
+      color: var(--ctp-mauve);
+    }
 
     /* =========================================================
        INTERNALS / CAPABILITIES
@@ -905,9 +1016,24 @@
       .arch-body {
         padding: 20px;
       }
-      .arch-diagram,
-      .arch-wire {
+      .flow-diagram {
+        gap: 0;
+      }
+      .flow-node-box {
+        padding: 10px 16px;
+        font-size: 12px;
+      }
+      .flow-arrows {
+        padding: 0 10px;
+      }
+      .flow-arrow-line {
+        width: 36px;
+      }
+      .wire-segment-name {
         font-size: 11px;
+      }
+      .wire-segment-detail {
+        font-size: 9px;
       }
       .start-body {
         padding: 20px;
@@ -951,12 +1077,6 @@
         <span class="hero-titlebar-text">vapor &mdash;&mdash; encrypted reverse shell</span>
       </div>
       <div class="hero-body">
-        <p class="hero-prompt">
-          <span class="prompt-symbol">&#x276F;</span>
-          <span class="prompt-path"> ~/vapor</span>
-          <span> $ </span>
-          <span class="prompt-cmd">make </span><span class="prompt-flag">LHOST=</span><span class="prompt-arg">10.10.14.1 </span><span class="prompt-flag">LPORT=</span><span class="prompt-arg">443 </span><span class="prompt-cmd">all</span>
-        </p>
         <h1 class="hero-title">Vapor<span class="hero-cursor" aria-hidden="true"></span></h1>
         <p class="hero-tagline">
           ChaCha20-Poly1305 encrypted reverse shell in pure x86_64 assembly.<br>
@@ -1063,16 +1183,52 @@
         <span class="arch-titlebar-text">vapor &mdash;&mdash; wire protocol</span>
       </div>
       <div class="arch-body">
-        <div class="arch-diagram"><span class="arch-label">[Target]                          [Operator]</span>
- <span class="arch-highlight">vapor.exe</span> <span class="arch-arrow">&#x2500;&#x2500;&#x2500;&#x2500; raw TCP &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x25BA;</span> <span class="arch-highlight">listener.py</span>
-           <span class="arch-arrow">&#x25C4;&#x2500; encrypted cmd &#x2500;&#x2500;</span>
-           <span class="arch-arrow">&#x2500;&#x2500; encrypted out &#x2500;&#x2500;&#x25BA;</span></div>
+        <div class="flow-diagram">
+          <div class="flow-node">
+            <div class="flow-node-box">vapor.exe</div>
+            <div class="flow-node-label">Target</div>
+          </div>
+          <div class="flow-arrows">
+            <div class="flow-arrow">
+              <div class="flow-arrow-line"></div>
+              <span class="flow-arrow-tag flow-arrow-tag--tcp">raw TCP</span>
+            </div>
+            <div class="flow-arrow flow-arrow--left">
+              <span class="flow-arrow-tag flow-arrow-tag--enc">encrypted cmd</span>
+              <div class="flow-arrow-line"></div>
+            </div>
+            <div class="flow-arrow">
+              <div class="flow-arrow-line"></div>
+              <span class="flow-arrow-tag flow-arrow-tag--enc">encrypted out</span>
+            </div>
+          </div>
+          <div class="flow-node">
+            <div class="flow-node-box">listener.py</div>
+            <div class="flow-node-label">Operator</div>
+          </div>
+        </div>
+
         <hr class="arch-divider">
-        <div class="arch-wire"><span class="wire-label">Wire Format:</span>
-<span style="color:var(--ctp-surface2);">&#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x252C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x252C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x252C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;</span>
-<span style="color:var(--ctp-surface2);">&#x2502;</span> <span class="wire-teal">len (4B)</span> <span style="color:var(--ctp-surface2);">&#x2502;</span> <span class="wire-blue">nonce (12B)</span>  <span style="color:var(--ctp-surface2);">&#x2502;</span> <span class="wire-yellow">ciphertext (N)</span> <span style="color:var(--ctp-surface2);">&#x2502;</span> <span class="wire-mauve">mac (16B)</span><span style="color:var(--ctp-surface2);">&#x2502;</span>
-<span style="color:var(--ctp-surface2);">&#x2502;</span> <span class="wire-teal">LE u32</span>   <span style="color:var(--ctp-surface2);">&#x2502;</span> <span class="wire-blue">random</span>       <span style="color:var(--ctp-surface2);">&#x2502;</span> <span class="wire-yellow">ChaCha20</span>      <span style="color:var(--ctp-surface2);">&#x2502;</span> <span class="wire-mauve">Poly1305</span> <span style="color:var(--ctp-surface2);">&#x2502;</span>
-<span style="color:var(--ctp-surface2);">&#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2534;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2534;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2534;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;</span></div>
+
+        <div class="wire-bar-label">Wire Format (per message)</div>
+        <div class="wire-bar">
+          <div class="wire-segment wire-seg--len">
+            <span class="wire-segment-name">len</span>
+            <span class="wire-segment-detail">4B &middot; LE u32</span>
+          </div>
+          <div class="wire-segment wire-seg--nonce">
+            <span class="wire-segment-name">nonce</span>
+            <span class="wire-segment-detail">12B &middot; random</span>
+          </div>
+          <div class="wire-segment wire-seg--ct">
+            <span class="wire-segment-name">ciphertext</span>
+            <span class="wire-segment-detail">N bytes &middot; ChaCha20</span>
+          </div>
+          <div class="wire-segment wire-seg--mac">
+            <span class="wire-segment-name">mac</span>
+            <span class="wire-segment-detail">16B &middot; Poly1305</span>
+          </div>
+        </div>
       </div>
     </div>
   </section>
