@@ -348,4 +348,8 @@ vapor/
 
 *Vapor — ChaCha20-Poly1305 reverse shell in ~3.6 KB*
 
+---
+
+**For authorized use only.** This tool is intended for legitimate security research, authorized penetration testing, and educational purposes. Unauthorized access to computer systems is illegal. Users are solely responsible for ensuring compliance with all applicable laws and obtaining proper authorization before use.
+
 </div>
