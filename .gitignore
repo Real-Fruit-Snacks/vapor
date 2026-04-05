@@ -1,11 +1,28 @@
+# ─── Build artifacts ───
 *.exe
 *.bin
 *.o
 *.obj
-*.pem
 *.inc
+
+# ─── Python ───
 __pycache__/
 *.pyc
+*.pyo
+
+# ─── Secrets / credentials ───
+*.pem
+*.key
+key.inc
+
+# ─── IDE / Editor ───
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─── AI / Orchestration ───
 .omc/
 .claude/
 .cursorrules
@@ -15,8 +32,17 @@ __pycache__/
 .codeium/
 .continue/
 .windsurf/
+
+# ─── OS ───
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# ─── Temp files ───
+*.tmp
+*.bak
+*.orig
+
+# ─── Tests / internal ───
 tests/
 docs/superpowers/
